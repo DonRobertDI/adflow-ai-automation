@@ -3,4 +3,9 @@
   "name": "adflow-studio",
   "compatibility_date": "2026-08-02",
   "pages_build_output_dir": "dist",
+
+  "vars": {
+    "VITE_USE_MOCK_API": "false",
+    "VITE_TURNSTILE_SITE_KEY": "0x4AAAAAAEEmbWtNoC_BTjxt"
+  }
 }
