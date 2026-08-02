@@ -1,0 +1,7 @@
+N8N_API_KEY=replace_me
+N8N_INTAKE_WEBHOOK_URL=http://localhost:5678/webhook/adflow-api-campaign-intake
+N8N_STATUS_WEBHOOK_URL=http://localhost:5678/webhook/adflow-api-campaign-status
+N8N_REVIEW_WEBHOOK_URL=http://localhost:5678/webhook/adflow-api-campaign-review
+N8N_DECISION_WEBHOOK_URL=http://localhost:5678/webhook/adflow-api-campaign-decision
+N8N_CONTACT_WEBHOOK_URL=http://localhost:5678/webhook/adflow-api-contact
+TURNSTILE_SECRET_KEY=replace_me

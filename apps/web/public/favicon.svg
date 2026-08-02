@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AdFlow Studio">
+  <rect width="64" height="64" rx="16" fill="#0b1020"/>
+  <path d="M15 44 28 16h8l13 28h-9l-2.4-6H26.3L24 44h-9Zm14.2-13h5.6L32 23.8 29.2 31Z" fill="#f8f5ef"/>
+  <circle cx="49" cy="17" r="6" fill="#ef3f8f"/>
+</svg>
