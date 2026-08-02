@@ -1,0 +1,304 @@
+{
+  "updatedAt": "2026-08-01T09:06:14.167Z",
+  "createdAt": "2026-08-01T08:52:41.288Z",
+  "id": "wa1t57gBG1CyDM9a",
+  "name": "01 - Test Client Database Operations",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -352,
+        -48
+      ],
+      "id": "08120da9-9a19-4b8f-bf46-983903a0635e",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c9c84b18-6f6e-4662-a29b-e682ba7824b0",
+              "name": "client_code",
+              "value": "CLIENT-DEMO-001",
+              "type": "string"
+            },
+            {
+              "id": "5f197ec1-6cd1-433d-947f-977ce8ef5148",
+              "name": "name",
+              "value": "Alex Morgan",
+              "type": "string"
+            },
+            {
+              "id": "4fb8b36a-f877-4af1-833d-3fe81fab92f8",
+              "name": "company_name",
+              "value": "LumaDesk Technologies",
+              "type": "string"
+            },
+            {
+              "id": "9c1d2782-b63d-49bb-a3e5-781e2a6e1b68",
+              "name": "=email",
+              "value": "alex@example.com",
+              "type": "string"
+            },
+            {
+              "id": "16551054-4762-40e9-adb7-c87d1164f3b5",
+              "name": "website",
+              "value": "https://example.com",
+              "type": "string"
+            },
+            {
+              "id": "570809d8-96b4-44c9-ba97-660fa2cbf316",
+              "name": "status",
+              "value": "active",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -144,
+        -48
+      ],
+      "id": "5eb3b238-bcfe-413a-84eb-f3a179ab0c01",
+      "name": "Sample Client Data"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "schema": {
+          "__rl": true,
+          "mode": "list",
+          "value": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "clients",
+          "mode": "list",
+          "cachedResultName": "clients"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "client_code": "={{ $json.client_code }}",
+            "name": "={{ $json.name }}",
+            "company_name": "={{ $json.company_name }}",
+            "email": "={{ $json.email }}",
+            "website": "={{ $json.website }}",
+            "status": "={{ $json.status }}"
+          },
+          "matchingColumns": [
+            "client_code"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "client_code",
+              "displayName": "client_code",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "company_name",
+              "displayName": "company_name",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "website",
+              "displayName": "website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        64,
+        -48
+      ],
+      "id": "ae5d1905-080e-4f16-83f6-b5c1cfda956d",
+      "name": "Save Client",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    id,\n    client_code,\n    name,\n    company_name,\n    email,\n    website,\n    status,\n    created_at,\n    updated_at\nFROM clients\nORDER BY created_at DESC;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        272,
+        -48
+      ],
+      "id": "95427796-0e32-40f9-8fbd-0b6226d596fe",
+      "name": "Read Saved Client",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Sample Client Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sample Client Data": {
+      "main": [
+        [
+          {
+            "node": "Save Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Client": {
+      "main": [
+        [
+          {
+            "node": "Read Saved Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "9bba71ae-aabc-4970-8a71-f2f19a36429b",
+  "activeVersionId": null,
+  "versionCounter": 43,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-01T08:52:41.288Z",
+      "createdAt": "2026-08-01T08:52:41.288Z",
+      "role": "workflow:owner",
+      "workflowId": "wa1t57gBG1CyDM9a",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

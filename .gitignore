@@ -1,20 +1,191 @@
-# Secrets
+# =========================================================
+# SECRETS AND ENVIRONMENT FILES
+# =========================================================
+
 .env
 .env.*
+**/.env
+**/.env.*
+
+.dev.vars
+.dev.vars.*
+**/.dev.vars
+**/.dev.vars.*
+
+# Keep safe example files
 !.env.example
+!**/.env.example
+!.dev.vars.example
+!**/.dev.vars.example
 
-# Logs and temporary files
-*.log
-tmp/
-temp/
 
-# Backups containing private data
+# =========================================================
+# NODE.JS / FRONTEND DEPENDENCIES
+# =========================================================
+
+node_modules/
+**/node_modules/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.npm/
+.pnpm-store/
+
+
+# =========================================================
+# BUILD OUTPUTS
+# =========================================================
+
+dist/
+**/dist/
+
+build/
+**/build/
+
+out/
+**/out/
+
+.vite/
+**/.vite/
+
+.cache/
+**/.cache/
+
+coverage/
+**/coverage/
+
+*.tsbuildinfo
+
+
+# =========================================================
+# CLOUDFLARE / WRANGLER
+# =========================================================
+
+.wrangler/
+**/.wrangler/
+
+.dev.vars
+**/.dev.vars
+
+
+# =========================================================
+# LOCAL N8N AND DATABASE DATA
+# =========================================================
+
+.n8n/
+**/.n8n/
+
+n8n_data/
+postgres_data/
+caddy_data/
+caddy_config/
+
+*.sqlite
+*.sqlite3
+database.sqlite
+database.sqlite3
+
+
+# =========================================================
+# BACKUPS AND DATABASE DUMPS
+# =========================================================
+
 backups/
+**/backups/
 
-# Operating system files
+*.sql.gz
+*.dump
+*.backup
+*.bak
+
+
+# =========================================================
+# ARCHIVES AND TEMPORARY EXPORTS
+# =========================================================
+
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+
+tmp/
+**/tmp/
+
+temp/
+**/temp/
+
+*.tmp
+*.temp
+
+
+# =========================================================
+# LOGS
+# =========================================================
+
+*.log
+logs/
+**/logs/
+
+
+# =========================================================
+# TEST AND TOOL OUTPUT
+# =========================================================
+
+playwright-report/
+test-results/
+.nyc_output/
+
+.eslintcache
+
+
+# =========================================================
+# OPERATING SYSTEM FILES
+# =========================================================
+
 .DS_Store
-Thumbs.db
+**/.DS_Store
 
-# Editor files
+Thumbs.db
+Desktop.ini
+
+
+# =========================================================
+# EDITORS
+# =========================================================
+
 .vscode/
 .idea/
+
+*.swp
+*.swo
+*~
+
+
+# =========================================================
+# PYTHON, IF USED BY AUTOMATION SCRIPTS
+# =========================================================
+
+__pycache__/
+*.py[cod]
+
+.venv/
+venv/
+env/
+
+
+# =========================================================
+# LOCAL SSL KEYS AND CERTIFICATES
+# =========================================================
+
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+
+certs/
+secrets/

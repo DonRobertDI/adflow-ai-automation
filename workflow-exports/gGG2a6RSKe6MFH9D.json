@@ -1,0 +1,451 @@
+{
+  "updatedAt": "2026-08-02T18:45:34.180Z",
+  "createdAt": "2026-08-02T02:03:50.987Z",
+  "id": "gGG2a6RSKe6MFH9D",
+  "name": "10 – Campaign Workspace Worker",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH next_job AS (\n    SELECT id\n\n    FROM automation_jobs\n\n    WHERE job_type =\n        'create_campaign_workspace'\n\n      AND status = 'queued'\n\n      AND available_at <= NOW()\n\n      AND attempts < max_attempts\n\n    ORDER BY\n        available_at,\n        created_at\n\n    FOR UPDATE SKIP LOCKED\n\n    LIMIT 1\n),\n\nclaimed_job AS (\n    UPDATE automation_jobs j\n\n    SET\n        status = 'processing',\n        attempts = j.attempts + 1,\n        locked_at = NOW(),\n        completed_at = NULL,\n        last_error = NULL\n\n    FROM next_job n\n\n    WHERE j.id = n.id\n\n    RETURNING\n        j.id,\n        j.campaign_id,\n        j.campaign_version_id,\n        j.approval_id,\n        j.status,\n        j.attempts\n)\n\nSELECT\n    claimed_job.id::TEXT AS job_id,\n    claimed_job.status AS job_status,\n    claimed_job.attempts,\n\n    c.id::TEXT AS campaign_id,\n    c.campaign_code,\n    c.brief,\n    c.status AS campaign_status,\n    c.drive_folder_id,\n\n    cv.id::TEXT AS campaign_version_id,\n    cv.version_number,\n    cv.content AS approved_content,\n\n    a.reviewer_name,\n    a.reviewer_email,\n    a.feedback AS approval_feedback,\n\n    cl.client_code,\n    cl.client_name,\n    cl.company_name,\n    cl.email AS client_email,\n    cl.website\n\nFROM claimed_job\n\nJOIN campaigns c\n    ON c.id = claimed_job.campaign_id\n\nJOIN campaign_versions cv\n    ON cv.id =\n       claimed_job.campaign_version_id\n\nJOIN approvals a\n    ON a.id = claimed_job.approval_id\n\nJOIN (\n    SELECT\n        id,\n        client_code,\n        name AS client_name,\n        company_name,\n        email,\n        website\n    FROM clients\n) cl\n    ON cl.id = c.client_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        -48,
+        32
+      ],
+      "id": "8bdd146c-4444-45f1-8596-7cdb70475b36",
+      "name": "Claim Workspace Job",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $('Build Styled PDF HTML').first().json.folder_name }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1gL7lw4UTDXbAALwpXAxoz94ZznLrZ6si",
+          "mode": "list",
+          "cachedResultName": "AdFlow Clients",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1gL7lw4UTDXbAALwpXAxoz94ZznLrZ6si"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        448,
+        32
+      ],
+      "id": "6267eac1-8b53-4bb8-85af-7fbd3f68d043",
+      "name": "Create Campaign Folder",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "TQXXHeQ8WhtUrg9A",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Build Styled PDF HTML').first().json.reviewer_email }}",
+        "subject": "={{\n  '[AdFlow] Production workspace created — ' +\n  $('Build Styled PDF HTML').first().json.campaign_code\n}}",
+        "message": "=<p>The approved campaign package has been prepared as a structured PDF.</p>\n\n<p>\n  <strong>Campaign:</strong>\n  {{ $('Build Styled PDF HTML').first().json.campaign_code }}\n</p>\n\n<p>\n  <strong>Company:</strong>\n  {{ $('Build Styled PDF HTML').first().json.company_name }}\n</p>\n\n<p>\n  <a href=\"https://drive.google.com/drive/folders/{{ $('Create Campaign Folder').first().json.id }}\">\n    Open the campaign workspace\n  </a>\n</p>\n\n<p>\n  The workspace contains the approved campaign plan in PDF format.\n</p>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1536,
+        32
+      ],
+      "id": "e885deb5-699d-4cfa-8ab4-2ec0c376faf6",
+      "name": "Send Campaign Workspace Email",
+      "webhookId": "4b97fd76-1601-4f24-80db-a045c3e70740",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "hLEkWVdS46nApANg",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input_data AS (\n    SELECT $1::JSONB AS data\n),\n\nvalidated_input AS (\n    SELECT\n        (data->>'job_id')::UUID\n            AS job_id,\n\n        (data->>'campaign_id')::UUID\n            AS campaign_id,\n\n        NULLIF(\n            data->>'folder_id',\n            ''\n        ) AS folder_id,\n\n        NULLIF(\n            data->>'pdf_file_id',\n            ''\n        ) AS pdf_file_id,\n\n        NULLIF(\n            data->>'pdf_file_name',\n            ''\n        ) AS pdf_file_name,\n\n        NULLIF(\n            data->>'pdf_drive_url',\n            ''\n        ) AS pdf_drive_url\n\n    FROM input_data\n\n    WHERE NULLIF(\n        data->>'job_id',\n        ''\n    ) IS NOT NULL\n\n      AND NULLIF(\n        data->>'campaign_id',\n        ''\n    ) IS NOT NULL\n\n      AND NULLIF(\n        data->>'folder_id',\n        ''\n    ) IS NOT NULL\n\n      AND NULLIF(\n        data->>'pdf_file_id',\n        ''\n    ) IS NOT NULL\n\n      AND NULLIF(\n        data->>'pdf_file_name',\n        ''\n    ) IS NOT NULL\n\n      AND NULLIF(\n        data->>'pdf_drive_url',\n        ''\n    ) IS NOT NULL\n),\n\ncomplete_job AS (\n    UPDATE automation_jobs\n\n    SET\n        status = 'completed',\n        completed_at = NOW(),\n        locked_at = NULL,\n        last_error = NULL\n\n    FROM validated_input\n\n    WHERE automation_jobs.id =\n        validated_input.job_id\n\n      AND automation_jobs.campaign_id =\n        validated_input.campaign_id\n\n      AND automation_jobs.job_type =\n        'create_campaign_workspace'\n\n      AND automation_jobs.status =\n        'processing'\n\n    RETURNING\n        automation_jobs.id,\n        automation_jobs.job_type,\n        automation_jobs.campaign_id,\n        automation_jobs.campaign_version_id,\n        automation_jobs.approval_id,\n        automation_jobs.status,\n        automation_jobs.attempts,\n        automation_jobs.max_attempts,\n        automation_jobs.completed_at,\n        automation_jobs.updated_at\n),\n\nupdate_campaign AS (\n    UPDATE campaigns\n\n    SET\n        drive_folder_id =\n            validated_input.folder_id,\n\n        pdf_file_id =\n            validated_input.pdf_file_id,\n\n        pdf_file_name =\n            validated_input.pdf_file_name,\n\n        pdf_drive_url =\n            validated_input.pdf_drive_url,\n\n        delivery_ready_at = NOW(),\n\n        status = 'completed'\n\n    FROM validated_input\n\n    JOIN complete_job\n        ON complete_job.campaign_id =\n           validated_input.campaign_id\n\n    WHERE campaigns.id =\n        complete_job.campaign_id\n\n    RETURNING\n        campaigns.id,\n        campaigns.campaign_code,\n        campaigns.status,\n        campaigns.drive_folder_id,\n        campaigns.pdf_file_id,\n        campaigns.pdf_file_name,\n        campaigns.pdf_drive_url,\n        campaigns.delivery_ready_at,\n        campaigns.updated_at\n),\n\nwrite_log AS (\n    INSERT INTO automation_logs (\n        workflow_name,\n        campaign_id,\n        level,\n        event_type,\n        message,\n        details\n    )\n\n    SELECT\n        '10 - Campaign Workspace Worker',\n\n        complete_job.campaign_id,\n\n        'info',\n\n        'campaign_workspace_created',\n\n        'The approved campaign PDF and Google Drive workspace were created successfully.',\n\n        JSONB_BUILD_OBJECT(\n            'job_id',\n                complete_job.id,\n\n            'job_type',\n                complete_job.job_type,\n\n            'campaign_code',\n                update_campaign.campaign_code,\n\n            'campaign_version_id',\n                complete_job.campaign_version_id,\n\n            'approval_id',\n                complete_job.approval_id,\n\n            'folder_id',\n                update_campaign.drive_folder_id,\n\n            'pdf_file_id',\n                update_campaign.pdf_file_id,\n\n            'pdf_file_name',\n                update_campaign.pdf_file_name,\n\n            'pdf_drive_url',\n                update_campaign.pdf_drive_url,\n\n            'delivery_ready_at',\n                update_campaign.delivery_ready_at,\n\n            'campaign_status',\n                update_campaign.status,\n\n            'attempts',\n                complete_job.attempts\n        )\n\n    FROM complete_job\n\n    JOIN update_campaign\n        ON update_campaign.id =\n           complete_job.campaign_id\n\n    RETURNING\n        id,\n        event_type,\n        created_at\n)\n\nSELECT\n    complete_job.id::TEXT\n        AS job_id,\n\n    complete_job.job_type,\n\n    complete_job.status\n        AS job_status,\n\n    complete_job.attempts,\n\n    complete_job.max_attempts,\n\n    complete_job.completed_at,\n\n    update_campaign.id::TEXT\n        AS campaign_id,\n\n    update_campaign.campaign_code,\n\n    update_campaign.status\n        AS campaign_status,\n\n    update_campaign.drive_folder_id,\n\n    update_campaign.pdf_file_id,\n\n    update_campaign.pdf_file_name,\n\n    update_campaign.pdf_drive_url,\n\n    update_campaign.delivery_ready_at,\n\n    update_campaign.updated_at,\n\n    write_log.id::TEXT\n        AS automation_log_id\n\nFROM complete_job\n\nJOIN update_campaign\n    ON update_campaign.id =\n       complete_job.campaign_id\n\nLEFT JOIN write_log\n    ON TRUE;",
+        "options": {
+          "queryReplacement": "={{\n  JSON.stringify({\n    job_id:\n      $('Claim Workspace Job').first().json.job_id,\n\n    campaign_id:\n      $('Claim Workspace Job').first().json.campaign_id,\n\n    folder_id:\n      $('Create Campaign Folder').first().json.id,\n\n    pdf_file_id:\n      $('Upload Campaign PDF').first().json.id,\n\n    pdf_file_name:\n      $('Upload Campaign PDF').first().json.name ??\n      $('Build Styled PDF HTML').first().json.pdf_file_name,\n\n    pdf_drive_url:\n      'https://drive.google.com/file/d/' +\n      $('Upload Campaign PDF').first().json.id +\n      '/view'\n  })\n}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        1744,
+        32
+      ],
+      "id": "1458d176-74d2-453c-b1c1-c0ccf5d652d4",
+      "name": "Complete Workspace Job",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\n\nfunction parseObject(value, label) {\n  if (typeof value === 'string') {\n    try {\n      return JSON.parse(value);\n    } catch {\n      throw new Error(`${label} contains invalid JSON.`);\n    }\n  }\n\n  return value ?? {};\n}\n\nfunction escapeHtml(value) {\n  return String(value ?? '')\n    .replaceAll('&', '&amp;')\n    .replaceAll('<', '&lt;')\n    .replaceAll('>', '&gt;')\n    .replaceAll('\"', '&quot;')\n    .replaceAll(\"'\", '&#039;');\n}\n\nfunction displayText(value) {\n  const cleaned = String(value ?? '').trim();\n\n  return cleaned\n    ? escapeHtml(cleaned).replaceAll('\\n', '<br>')\n    : '<span class=\"muted\">Not provided</span>';\n}\n\nfunction renderList(values) {\n  if (!Array.isArray(values) || values.length === 0) {\n    return '<p class=\"muted\">None listed.</p>';\n  }\n\n  return `\n    <ul>\n      ${values\n        .map((value) => `<li>${displayText(value)}</li>`)\n        .join('')}\n    </ul>\n  `;\n}\n\nconst brief = parseObject(\n  row.brief,\n  'Campaign brief'\n);\n\nconst content = parseObject(\n  row.approved_content,\n  'Approved campaign package'\n);\n\nconst campaignBrief = brief.campaign ?? {};\nconst foundation = content.strategic_foundation ?? {};\n\nconst angles = Array.isArray(content.ad_angles)\n  ? content.ad_angles\n  : [];\n\nconst hooks = Array.isArray(content.hooks)\n  ? content.hooks\n  : [];\n\nconst ads = Array.isArray(content.ads)\n  ? content.ads\n  : [];\n\nconst images = Array.isArray(content.image_prompts)\n  ? content.image_prompts\n  : [];\n\nconst videos = Array.isArray(content.video_concepts)\n  ? content.video_concepts\n  : [];\n\nconst compliance = content.compliance_review ?? {};\n\nconst html = `\n<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n\n  <meta\n    name=\"viewport\"\n    content=\"width=device-width, initial-scale=1.0\"\n  >\n\n  <title>\n    ${escapeHtml(row.campaign_code)} Approved Campaign\n  </title>\n\n  <style>\n    @page {\n      size: A4;\n      margin: 16mm 15mm;\n    }\n    @page:first {\n      size: A4;\n      margin: 0;\n    }\n\n    * {\n      box-sizing: border-box;\n    }\n\n    html {\n      print-color-adjust: exact;\n      -webkit-print-color-adjust: exact;\n    }\n\n    body {\n      margin: 0;\n      color: #1f2937;\n      font-family: Arial, Helvetica, sans-serif;\n      font-size: 10.5pt;\n      line-height: 1.55;\n    }\n\n    h1,\n    h2,\n    h3,\n    p {\n      margin-top: 0;\n    }\n\n    h1 {\n      font-size: 30pt;\n      line-height: 1.1;\n    }\n\n    h2 {\n      margin: 0 0 14px;\n      padding-bottom: 7px;\n      border-bottom: 2px solid #d946ef;\n      color: #111827;\n      font-size: 19pt;\n      break-after: avoid-page;\n      page-break-after: avoid;\n    }\n\n    h3 {\n      margin-bottom: 7px;\n      color: #111827;\n      font-size: 13pt;\n    }\n\n    ul,\n    ol {\n      padding-left: 22px;\n    }\n\n    li {\n      margin-bottom: 6px;\n    }\n\n    .cover {\n      min-height: 297mm;\n      margin: 0;\n      padding: 40mm 24mm 24mm;\n      display: flex;\n      flex-direction: column;\n      justify-content: space-between;\n      background:\n        linear-gradient(\n          135deg,\n          #111827 0%,\n          #312e81 55%,\n          #86198f 100%\n        );\n      color: white;\n      page-break-after: always;\n    }\n\n    .cover-label {\n      margin-bottom: 18px;\n      color: #f0abfc;\n      font-size: 11pt;\n      font-weight: 700;\n      letter-spacing: 0.12em;\n      text-transform: uppercase;\n    }\n\n    .cover h1 {\n      max-width: 700px;\n      margin-bottom: 18px;\n      color: white;\n    }\n\n    .cover-summary {\n      max-width: 650px;\n      color: #e5e7eb;\n      font-size: 13pt;\n    }\n\n    .cover-meta {\n      display: grid;\n      grid-template-columns: 1fr 1fr;\n      gap: 12px;\n    }\n\n    .cover-meta-item {\n      padding: 13px;\n      background: rgba(255, 255, 255, 0.1);\n      border: 1px solid rgba(255, 255, 255, 0.22);\n      border-radius: 8px;\n    }\n\n    .cover-meta-label,\n    .label {\n      display: block;\n      margin-bottom: 4px;\n      color: #6b7280;\n      font-size: 8pt;\n      font-weight: 700;\n      letter-spacing: 0.08em;\n      text-transform: uppercase;\n    }\n\n    .cover-meta-label {\n      color: #d8b4fe;\n    }\n\n    .section {\n      margin-bottom: 24px;\n      break-inside: auto;\n      page-break-inside: auto;\n    }\n\n    .section > h2 + * {\n      break-before: avoid-page;\n      page-break-before: avoid;\n    }\n    \n    .page-break {\n      break-before: auto;\n      page-break-before: auto;\n    }\n\n    .grid {\n      display: grid;\n      grid-template-columns: 1fr 1fr;\n      gap: 12px;\n    }\n\n    .card {\n      padding: 15px;\n      background: #f8fafc;\n      border: 1px solid #e5e7eb;\n      border-radius: 8px;\n      break-inside: auto;\n      page-break-inside: auto;\n    }\n    \n    .card + .card {\n      margin-top: 14px;\n    }\n    \n    .card-accent {\n      border-left: 4px solid #d946ef;\n    }\n\n    .summary-box {\n      margin-bottom: 18px;\n      padding: 18px;\n      background: #faf5ff;\n      border: 1px solid #e9d5ff;\n      border-radius: 9px;\n      font-size: 11pt;\n    }\n\n    .metadata-table {\n      width: 100%;\n      border-collapse: collapse;\n      margin-bottom: 20px;\n    }\n\n    .metadata-table td {\n      padding: 9px 11px;\n      border: 1px solid #e5e7eb;\n      vertical-align: top;\n    }\n\n    .metadata-table td:first-child {\n      width: 30%;\n      background: #f8fafc;\n      color: #4b5563;\n      font-weight: 700;\n    }\n\n    .identifier {\n      display: inline-block;\n      margin-bottom: 8px;\n      padding: 3px 8px;\n      background: #ede9fe;\n      border-radius: 999px;\n      color: #5b21b6;\n      font-size: 8.5pt;\n      font-weight: 700;\n    }\n\n    .copy-block {\n      padding: 13px;\n      background: white;\n      border: 1px solid #e5e7eb;\n      border-radius: 6px;\n      white-space: normal;\n    }\n\n    .subsection {\n      margin-top: 12px;\n    }\n\n    .muted {\n      color: #6b7280;\n    }\n\n    .warning {\n      padding: 14px;\n      background: #fff7ed;\n      border: 1px solid #fed7aa;\n      border-left: 4px solid #f97316;\n      border-radius: 7px;\n      break-inside: auto;\n      page-break-inside: auto;\n    }\n\n    .warning + .warning {\n      margin-top: 14px;\n    }\n\n    .approval {\n      padding: 18px;\n      background: #ecfdf5;\n      border: 1px solid #a7f3d0;\n      border-radius: 9px;\n      break-inside: avoid;\n    }\n\n    .approval-title {\n      color: #047857;\n      font-size: 14pt;\n      font-weight: 700;\n    }\n\n    .footer-note {\n      margin-top: 28px;\n      padding-top: 10px;\n      border-top: 1px solid #d1d5db;\n      color: #6b7280;\n      font-size: 8.5pt;\n      text-align: center;\n    }\n  </style>\n</head>\n\n<body>\n  <section class=\"cover\">\n    <div>\n      <div class=\"cover-label\">\n        Approved Advertising Campaign\n      </div>\n\n      <h1>\n        ${escapeHtml(row.company_name)}\n      </h1>\n\n      <p class=\"cover-summary\">\n        ${displayText(content.campaign_summary)}\n      </p>\n    </div>\n\n    <div class=\"cover-meta\">\n      <div class=\"cover-meta-item\">\n        <span class=\"cover-meta-label\">\n          Campaign reference\n        </span>\n\n        ${escapeHtml(row.campaign_code)}\n      </div>\n\n      <div class=\"cover-meta-item\">\n        <span class=\"cover-meta-label\">\n          Approved version\n        </span>\n\n        ${escapeHtml(row.version_number)}\n      </div>\n\n      <div class=\"cover-meta-item\">\n        <span class=\"cover-meta-label\">\n          Client\n        </span>\n\n        ${escapeHtml(row.client_name)}\n      </div>\n\n      <div class=\"cover-meta-item\">\n        <span class=\"cover-meta-label\">\n          Reviewer\n        </span>\n\n        ${escapeHtml(row.reviewer_name)}\n      </div>\n    </div>\n  </section>\n\n  <section class=\"section\">\n    <h2>Campaign Overview</h2>\n\n    <div class=\"summary-box\">\n      ${displayText(content.campaign_summary)}\n    </div>\n\n    <table class=\"metadata-table\">\n      <tr>\n        <td>Company</td>\n        <td>${displayText(row.company_name)}</td>\n      </tr>\n\n      <tr>\n        <td>Website</td>\n        <td>${displayText(row.website)}</td>\n      </tr>\n\n      <tr>\n        <td>Campaign reference</td>\n        <td>${displayText(row.campaign_code)}</td>\n      </tr>\n\n      <tr>\n        <td>Approved version</td>\n        <td>${displayText(row.version_number)}</td>\n      </tr>\n\n      <tr>\n        <td>Campaign objective</td>\n        <td>${displayText(row.objective)}</td>\n      </tr>\n\n      <tr>\n        <td>Brand tone</td>\n        <td>${displayText(row.brand_tone)}</td>\n      </tr>\n\n      <tr>\n        <td>Offer</td>\n        <td>${displayText(row.offer)}</td>\n      </tr>\n\n      <tr>\n        <td>Call to action</td>\n        <td>\n          ${displayText(campaignBrief.call_to_action)}\n        </td>\n      </tr>\n    </table>\n  </section>\n\n  <section class=\"section\">\n    <h2>Strategic Foundation</h2>\n\n    <div class=\"grid\">\n      <article class=\"card card-accent\">\n        <span class=\"label\">Audience summary</span>\n        ${displayText(foundation.audience_summary)}\n      </article>\n\n      <article class=\"card card-accent\">\n        <span class=\"label\">Primary problem</span>\n        ${displayText(foundation.primary_problem)}\n      </article>\n\n      <article class=\"card card-accent\">\n        <span class=\"label\">Desired outcome</span>\n        ${displayText(foundation.desired_outcome)}\n      </article>\n\n      <article class=\"card card-accent\">\n        <span class=\"label\">Offer positioning</span>\n        ${displayText(foundation.offer_positioning)}\n      </article>\n    </div>\n  </section>\n\n  <section class=\"section\">\n    <h2>Advertising Angles</h2>\n\n    ${angles.map((angle) => `\n      <article class=\"card card-accent\">\n        <span class=\"identifier\">\n          ${escapeHtml(angle.angle_id)}\n        </span>\n\n        <h3>${escapeHtml(angle.name)}</h3>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Awareness stage</span>\n          ${displayText(angle.awareness_stage)}\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Core message</span>\n          ${displayText(angle.core_message)}\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Rationale</span>\n          ${displayText(angle.rationale)}\n        </div>\n      </article>\n      \n    `).join('')}\n  </section>\n\n  <section class=\"section\">\n    <h2>Advertising Hooks</h2>\n\n    <ol>\n      ${hooks.map((hook) => `\n        <li>\n          <strong>${escapeHtml(hook.hook_id)}</strong>\n          -\n          ${displayText(hook.hook_text)}\n          <span class=\"muted\">\n            (${escapeHtml(hook.angle_id)})\n          </span>\n        </li>\n      `).join('')}\n    </ol>\n  </section>\n\n  <section class=\"section\">\n    <h2>Approved Ad Copy</h2>\n\n    ${ads.map((ad) => `\n      <article class=\"card\">\n        <span class=\"identifier\">\n          ${escapeHtml(ad.ad_id)}\n          ·\n          ${escapeHtml(ad.angle_id)}\n        </span>\n\n        <h3>${escapeHtml(ad.headline)}</h3>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Primary text</span>\n\n          <div class=\"copy-block\">\n            ${displayText(ad.primary_text)}\n          </div>\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Description</span>\n          ${displayText(ad.description)}\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Call to action</span>\n          ${displayText(ad.call_to_action)}\n        </div>\n      </article>\n     \n    `).join('')}\n  </section>\n\n  <section class=\"section\">\n    <h2>Image Creative Directions</h2>\n\n    ${images.map((image) => `\n      <article class=\"card\">\n        <span class=\"identifier\">\n          ${escapeHtml(image.prompt_id)}\n          ·\n          ${escapeHtml(image.angle_id)}\n        </span>\n\n        <h3>${escapeHtml(image.concept_name)}</h3>\n\n        <div class=\"subsection\">\n          <span class=\"label\">AI image prompt</span>\n\n          <div class=\"copy-block\">\n            ${displayText(image.prompt)}\n          </div>\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Suggested overlay</span>\n          ${displayText(image.overlay_text)}\n        </div>\n      </article>\n      \n    `).join('')}\n  </section>\n\n  <section class=\"section\">\n    <h2>Video Creative Directions</h2>\n\n    ${videos.map((video) => `\n      <article class=\"card\">\n        <span class=\"identifier\">\n          ${escapeHtml(video.concept_id)}\n          ·\n          ${escapeHtml(video.duration_seconds)} seconds\n        </span>\n\n        <h3>${escapeHtml(video.concept_name)}</h3>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Opening hook</span>\n          ${displayText(video.opening_hook)}\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Scene plan</span>\n          ${renderList(video.scene_plan)}\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">Voiceover</span>\n\n          <div class=\"copy-block\">\n            ${displayText(video.voiceover)}\n          </div>\n        </div>\n\n        <div class=\"subsection\">\n          <span class=\"label\">End card</span>\n          ${displayText(video.end_card_text)}\n        </div>\n      </article>\n     \n    `).join('')}\n  </section>\n\n  <section class=\"section\">\n    <h2>Compliance and Quality Review</h2>\n\n    <div class=\"warning\">\n      <h3>Unsupported claims to avoid</h3>\n      ${renderList(compliance.unsupported_claims)}\n    </div>\n\n  \n\n    <div class=\"warning\">\n      <h3>Policy or sensitivity risks</h3>\n      ${renderList(compliance.sensitive_or_policy_risks)}\n    </div>\n\n \n\n    <div class=\"warning\">\n      <h3>Items requiring human confirmation</h3>\n      ${renderList(compliance.notes_for_human_reviewer)}\n    </div>\n  </section>\n\n  <section class=\"section\">\n    <h2>Approval Record</h2>\n\n    <div class=\"approval\">\n      <div class=\"approval-title\">\n        Approved for production\n      </div>\n\n      <p>\n        <strong>Reviewer:</strong>\n        ${displayText(row.reviewer_name)}\n      </p>\n\n      <p>\n        <strong>Reviewer email:</strong>\n        ${displayText(row.reviewer_email)}\n      </p>\n\n      <p>\n        <strong>Approval feedback:</strong><br>\n        ${displayText(\n          row.approval_feedback ||\n          'No additional approval feedback.'\n        )}\n      </p>\n    </div>\n\n    <div class=\"footer-note\">\n      Generated automatically by AdFlow AI.\n      Human approval is required before production or publication.\n    </div>\n  </section>\n</body>\n</html>\n`;\n\nreturn [\n  {\n    json: {\n      ...row,\n\n      folder_name:\n        `${row.campaign_code} - ${row.company_name}`,\n\n      html_file_name:\n        'index.html',\n\n      pdf_file_name:\n        `${row.campaign_code}-approved-campaign.pdf`,\n\n      pdf_html: html,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        32
+      ],
+      "id": "8d0b7403-208f-4c28-b245-7b1635b627a5",
+      "name": "Build Styled PDF HTML"
+    },
+    {
+      "parameters": {
+        "operation": "toText",
+        "sourceProperty": "=pdf_html",
+        "binaryPropertyName": "html_file",
+        "options": {
+          "fileName": "index.html"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        864,
+        32
+      ],
+      "id": "93f492d6-2cd5-4265-a4fd-bfc4e6f583e4",
+      "name": "Convert HTML to File"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://gotenberg:3000/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "html_file"
+            },
+            {
+              "name": "printBackground",
+              "value": "true"
+            },
+            {
+              "name": "preferCssPageSize",
+              "value": "true"
+            },
+            {
+              "name": "generateDocumentOutline",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1072,
+        32
+      ],
+      "id": "85c5d88c-675f-4a7d-9b8a-5090a79d4e0e",
+      "name": "Generate Campaign PDF"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Build Styled PDF HTML').first().json.pdf_file_name }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $('Create Campaign Folder').first().json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1296,
+        32
+      ],
+      "id": "e493fb59-f498-43dd-b7cf-1442e96c533b",
+      "name": "Upload Campaign PDF",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "TQXXHeQ8WhtUrg9A",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        -80
+      ],
+      "id": "3f22bc2c-1eb6-4b22-bb32-6d2dddfb3e49",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -320,
+        144
+      ],
+      "id": "1b39aa7b-6059-4bfc-aac8-272e929e7626",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "483054ff-5b27-4002-9046-6fe8e7271c81",
+              "name": "pdf_html",
+              "value": "={{ $('Build Styled PDF HTML').first().json.pdf_html }}",
+              "type": "string"
+            },
+            {
+              "id": "4ca01306-517d-4d9e-a2f8-75c41d39efa1",
+              "name": "pdf_file_name",
+              "value": "={{ $('Build Styled PDF HTML').first().json.pdf_file_name }}",
+              "type": "string"
+            },
+            {
+              "id": "8203ae92-60a6-42c0-a170-5b550728373c",
+              "name": "folder_id",
+              "value": "={{ $('Create Campaign Folder').first().json.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        656,
+        32
+      ],
+      "id": "e51f8793-e41c-4c55-9057-d958d9772709",
+      "name": "Prepare PDF Fields"
+    }
+  ],
+  "connections": {
+    "Claim Workspace Job": {
+      "main": [
+        [
+          {
+            "node": "Build Styled PDF HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Campaign Folder": {
+      "main": [
+        [
+          {
+            "node": "Prepare PDF Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Campaign Workspace Email": {
+      "main": [
+        [
+          {
+            "node": "Complete Workspace Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Styled PDF HTML": {
+      "main": [
+        [
+          {
+            "node": "Create Campaign Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert HTML to File": {
+      "main": [
+        [
+          {
+            "node": "Generate Campaign PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Campaign PDF": {
+      "main": [
+        [
+          {
+            "node": "Upload Campaign PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Campaign PDF": {
+      "main": [
+        [
+          {
+            "node": "Send Campaign Workspace Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Claim Workspace Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Claim Workspace Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare PDF Fields": {
+      "main": [
+        [
+          {
+            "node": "Convert HTML to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "ucpLfArRw6Q1Ribz",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {
+    "node:Schedule Trigger": {
+      "recurrenceRules": [
+        null
+      ],
+      "recurrenceRuleSignatures": [
+        null
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "bff9c719-9200-4c94-aae7-675391576dba",
+  "activeVersionId": "bff9c719-9200-4c94-aae7-675391576dba",
+  "versionCounter": 171,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T02:03:50.987Z",
+      "createdAt": "2026-08-02T02:03:50.987Z",
+      "role": "workflow:owner",
+      "workflowId": "gGG2a6RSKe6MFH9D",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version bff9c719",
+    "description": ""
+  }
+}

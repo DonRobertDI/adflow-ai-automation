@@ -1,0 +1,311 @@
+{
+  "updatedAt": "2026-08-02T12:58:22.048Z",
+  "createdAt": "2026-08-01T19:46:42.288Z",
+  "id": "az8lpGnRRIyERm8o",
+  "name": "02 - AdFlow Client Intake",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Meta Ads Campaign Brief",
+        "formDescription": "Tell us about your business, offer, audience, and campaign goals.\n\nPlease provide accurate information. The submitted details will be used to prepare your advertising strategy and creative concepts.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Client Name",
+              "placeholder": "Alex Morgan",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Company Name",
+              "placeholder": "LumaDesk",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Client Email",
+              "fieldType": "email",
+              "placeholder": "alex@example.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Website",
+              "placeholder": "https://example.com"
+            },
+            {
+              "fieldLabel": "Product or Service",
+              "fieldType": "textarea",
+              "placeholder": "Describe the product or service, its main features, and how it helps customers.",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Target Audience",
+              "fieldType": "textarea",
+              "placeholder": "Remote workers aged 22 to 40 who often work during the evening.",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Main Customer Problem",
+              "fieldType": "textarea",
+              "placeholder": "Their workspace has poor lighting, causing discomfort and reduced focus.",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Offer",
+              "fieldType": "textarea",
+              "placeholder": "20% launch discount plus free delivery.",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Campaign Objective",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Lead Generation"
+                  },
+                  {
+                    "option": "Sales"
+                  },
+                  {
+                    "option": "Website Traffic"
+                  },
+                  {
+                    "option": "Brand Awareness"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Brand Tone",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Professional"
+                  },
+                  {
+                    "option": "Friendly"
+                  },
+                  {
+                    "option": "Energetic"
+                  },
+                  {
+                    "option": "Simple"
+                  },
+                  {
+                    "option": "Premium"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Call to Action",
+              "placeholder": "Learn More",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Competitor Examples",
+              "fieldType": "textarea",
+              "placeholder": "Add competitor names, websites, or ads the client likes."
+            },
+            {
+              "fieldLabel": "Additional Notes",
+              "fieldType": "textarea",
+              "placeholder": "Add restrictions, preferred wording, claims to avoid, or other instructions."
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "ignoreBots": true,
+          "useWorkflowTimezone": true
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "573a4ac8-c3c1-4e96-984b-8ec5541cdf90",
+      "name": "Client Campaign Brief",
+      "webhookId": "7c621498-7937-4516-81ab-ce0fd3f238d9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json;\n\n/**\n * Find the first available value using several possible field names.\n *\n * Different n8n versions may use either the visible form label\n * or a configured internal field name.\n */\nfunction getValue(...possibleNames) {\n  for (const name of possibleNames) {\n    const value = input[name];\n\n    if (value !== undefined && value !== null) {\n      return String(value).trim();\n    }\n  }\n\n  return '';\n}\n\n/**\n * Clean short, single-line values.\n */\nfunction cleanSingleLine(value) {\n  return String(value ?? '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/**\n * Clean longer textarea values while keeping useful line breaks.\n */\nfunction cleanMultiline(value) {\n  return String(value ?? '')\n    .replace(/\\r\\n/g, '\\n')\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\n/**\n * Create a safe code-friendly version of a name.\n *\n * Example:\n * \"LumaDesk Technologies\" becomes \"LUMADESK-TECHNOLOGIES\"\n */\nfunction makeSlug(value) {\n  return String(value)\n    .normalize('NFKD')\n    .replace(/[^\\w\\s-]/g, '')\n    .trim()\n    .replace(/[\\s_]+/g, '-')\n    .replace(/-+/g, '-')\n    .toUpperCase();\n}\n\n/**\n * Small deterministic hash.\n *\n * This is not for password security.\n * It is only used to produce a consistent client reference.\n */\nfunction simpleHash(value) {\n  let hash = 2166136261;\n\n  for (let index = 0; index < value.length; index += 1) {\n    hash ^= value.charCodeAt(index);\n    hash = Math.imul(hash, 16777619);\n  }\n\n  return (hash >>> 0)\n    .toString(36)\n    .toUpperCase()\n    .padStart(7, '0')\n    .slice(0, 7);\n}\n\n/**\n * Add https:// when the client entered a domain without a protocol.\n */\nfunction normalizeWebsite(value) {\n  const cleaned = cleanSingleLine(value);\n\n  if (!cleaned) {\n    return '';\n  }\n\n  const withProtocol = /^https?:\\/\\//i.test(cleaned)\n    ? cleaned\n    : `https://${cleaned}`;\n\n  const websitePattern =\n    /^https?:\\/\\/[a-z0-9.-]+\\.[a-z]{2,}(?::\\d{1,5})?(?:[/?#][^\\s]*)?$/i;\n\n  if (!websitePattern.test(withProtocol)) {\n    throw new Error(\n      'Website must be a valid web address, such as https://example.com.'\n    );\n  }\n\n  return withProtocol.replace(/\\/+$/, '');\n}\n\nconst clientName = cleanSingleLine(\n  getValue('Client Name', 'client_name')\n);\n\nconst companyName = cleanSingleLine(\n  getValue('Company Name', 'company_name')\n);\n\nconst clientEmail = cleanSingleLine(\n  getValue('Client Email', 'client_email', 'email')\n).toLowerCase();\n\nconst rawWebsite = getValue('Website', 'website');\n\nconst productService = cleanMultiline(\n  getValue('Product or Service', 'product_service')\n);\n\nconst targetAudience = cleanMultiline(\n  getValue('Target Audience', 'target_audience')\n);\n\nconst mainCustomerProblem = cleanMultiline(\n  getValue('Main Customer Problem', 'main_customer_problem')\n);\n\nconst offer = cleanMultiline(\n  getValue('Offer', 'offer')\n);\n\nconst campaignObjective = cleanSingleLine(\n  getValue('Campaign Objective', 'campaign_objective')\n);\n\nconst brandTone = cleanSingleLine(\n  getValue('Brand Tone', 'brand_tone')\n);\n\nconst callToAction = cleanSingleLine(\n  getValue('Call to Action', 'call_to_action')\n);\n\nconst competitorExamples = cleanMultiline(\n  getValue('Competitor Examples', 'competitor_examples')\n);\n\nconst additionalNotes = cleanMultiline(\n  getValue('Additional Notes', 'additional_notes')\n);\n\nconst submittedAt =\n  getValue('submittedAt', 'submitted_at') ||\n  new Date().toISOString();\n\n/**\n * Server-side validation.\n *\n * Form-required fields improve the user experience, but a real system\n * should still validate the data after it reaches the workflow.\n */\nconst validationErrors = [];\n\nconst requiredValues = {\n  'Client Name': clientName,\n  'Company Name': companyName,\n  'Client Email': clientEmail,\n  'Product or Service': productService,\n  'Target Audience': targetAudience,\n  'Main Customer Problem': mainCustomerProblem,\n  Offer: offer,\n  'Campaign Objective': campaignObjective,\n  'Brand Tone': brandTone,\n  'Call to Action': callToAction,\n};\n\nfor (const [label, value] of Object.entries(requiredValues)) {\n  if (!value) {\n    validationErrors.push(`${label} is required.`);\n  }\n}\n\nconst emailPattern = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\nif (clientEmail && !emailPattern.test(clientEmail)) {\n  validationErrors.push('Client Email is not a valid email address.');\n}\n\nconst allowedObjectives = [\n  'Lead Generation',\n  'Sales',\n  'Website Traffic',\n  'Brand Awareness',\n];\n\nif (\n  campaignObjective &&\n  !allowedObjectives.includes(campaignObjective)\n) {\n  validationErrors.push('Campaign Objective is not supported.');\n}\n\nconst allowedBrandTones = [\n  'Professional',\n  'Friendly',\n  'Energetic',\n  'Simple',\n  'Premium',\n];\n\nif (brandTone && !allowedBrandTones.includes(brandTone)) {\n  validationErrors.push('Brand Tone is not supported.');\n}\n\n/**\n * Limit text sizes so a form submission cannot send an unexpectedly\n * huge amount of information into the database or AI model.\n */\nconst lengthLimits = [\n  ['Client Name', clientName, 150],\n  ['Company Name', companyName, 150],\n  ['Client Email', clientEmail, 255],\n  ['Product or Service', productService, 5000],\n  ['Target Audience', targetAudience, 5000],\n  ['Main Customer Problem', mainCustomerProblem, 5000],\n  ['Offer', offer, 3000],\n  ['Call to Action', callToAction, 150],\n  ['Competitor Examples', competitorExamples, 5000],\n  ['Additional Notes', additionalNotes, 5000],\n];\n\nfor (const [label, value, maximum] of lengthLimits) {\n  if (value.length > maximum) {\n    validationErrors.push(\n      `${label} exceeds the ${maximum}-character limit.`\n    );\n  }\n}\n\nlet website = '';\n\nif (rawWebsite) {\n  try {\n    website = normalizeWebsite(rawWebsite);\n  } catch (error) {\n    validationErrors.push(error.message);\n  }\n}\n\nif (validationErrors.length > 0) {\n  throw new Error(\n    `Campaign brief validation failed:\\n- ${validationErrors.join('\\n- ')}`\n  );\n}\n\n/**\n * The same company and email will produce the same client code.\n *\n * That allows us to update an existing client instead of creating\n * another client row every time they submit a new campaign.\n */\nconst clientIdentity = `${companyName.toLowerCase()}|${clientEmail}`;\n\nconst companySlug =\n  makeSlug(companyName).slice(0, 22) || 'CLIENT';\n\nconst clientCode = `CL-${companySlug}-${simpleHash(clientIdentity)}`;\n\n/**\n * The campaign code is readable by humans and unique enough for\n * the portfolio workflow.\n */\nconst now = new Date();\n\nconst datePart = now\n  .toISOString()\n  .replace(/\\D/g, '')\n  .slice(0, 14);\n\nconst randomPart = Math.random()\n  .toString(36)\n  .slice(2, 7)\n  .toUpperCase()\n  .padEnd(5, '0');\n\nconst campaignCode = `CMP-${datePart}-${randomPart}`;\n\n/**\n * Store the full original business brief as JSON.\n *\n * PostgreSQL columns keep the most commonly searched fields, while\n * this JSON object preserves the complete brief.\n */\nconst brief = {\n  client: {\n    name: clientName,\n    company_name: companyName,\n    email: clientEmail,\n    website,\n  },\n  campaign: {\n    product_service: productService,\n    target_audience: targetAudience,\n    main_customer_problem: mainCustomerProblem,\n    offer,\n    objective: campaignObjective,\n    brand_tone: brandTone,\n    call_to_action: callToAction,\n    competitor_examples: competitorExamples,\n    additional_notes: additionalNotes,\n  },\n  submission: {\n    submitted_at: submittedAt,\n    form_version: '1.0.0',\n  },\n};\n\n/**\n * This value creates a repeatable fingerprint for one form submission.\n *\n * Retrying the same saved execution will use the same submittedAt and\n * the same data, allowing PostgreSQL to identify it as the same\n * submission rather than creating a duplicate campaign.\n */\nconst idempotencyMaterial = JSON.stringify({\n  submitted_at: submittedAt,\n  client_email: clientEmail,\n  company_name: companyName,\n  product_service: productService,\n  target_audience: targetAudience,\n  offer,\n  campaign_objective: campaignObjective,\n});\n\n/**\n * One object containing everything needed by PostgreSQL.\n */\nconst dbPayload = {\n  client_code: clientCode,\n  client_name: clientName,\n  company_name: companyName,\n  client_email: clientEmail,\n  website,\n\n  campaign_code: campaignCode,\n  product_service: productService,\n  target_audience: targetAudience,\n  offer,\n  campaign_objective: campaignObjective,\n  brand_tone: brandTone,\n\n  brief,\n  idempotency_material: idempotencyMaterial,\n};\n\nreturn [\n  {\n    json: {\n      client_code: clientCode,\n      campaign_code: campaignCode,\n      client_name: clientName,\n      company_name: companyName,\n      client_email: clientEmail,\n      website,\n      product_service: productService,\n      target_audience: targetAudience,\n      main_customer_problem: mainCustomerProblem,\n      offer,\n      campaign_objective: campaignObjective,\n      brand_tone: brandTone,\n      call_to_action: callToAction,\n      competitor_examples: competitorExamples,\n      additional_notes: additionalNotes,\n      submitted_at: submittedAt,\n      brief,\n      db_payload: dbPayload,\n      status: 'validated',\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "46f420fc-0559-44f2-9dd4-879bfca6b62f",
+      "name": "Normalize and Validate Brief"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input_data AS (\n    SELECT $1::JSONB AS data\n),\n\nupsert_client AS (\n    INSERT INTO clients (\n        client_code,\n        name,\n        company_name,\n        email,\n        website,\n        status\n    )\n    SELECT\n        data->>'client_code',\n        data->>'client_name',\n        data->>'company_name',\n        data->>'client_email',\n        NULLIF(data->>'website', ''),\n        'active'\n    FROM input_data\n\n    ON CONFLICT (client_code)\n    DO UPDATE SET\n        name = EXCLUDED.name,\n        company_name = EXCLUDED.company_name,\n        email = EXCLUDED.email,\n        website = EXCLUDED.website,\n        status = 'active'\n\n    RETURNING\n        id,\n        client_code,\n        name,\n        company_name,\n        email,\n        website\n),\n\nsave_campaign AS (\n    INSERT INTO campaigns (\n        campaign_code,\n        client_id,\n        source_submission_id,\n        product_service,\n        target_audience,\n        offer,\n        objective,\n        brand_tone,\n        status,\n        brief\n    )\n    SELECT\n        input_data.data->>'campaign_code',\n        upsert_client.id,\n\n        'FORM-' || encode(\n            digest(\n                input_data.data->>'idempotency_material',\n                'sha256'\n            ),\n            'hex'\n        ),\n\n        input_data.data->>'product_service',\n        input_data.data->>'target_audience',\n        input_data.data->>'offer',\n        input_data.data->>'campaign_objective',\n        input_data.data->>'brand_tone',\n        'brief_received',\n        input_data.data->'brief'\n\n    FROM input_data\n    CROSS JOIN upsert_client\n\n    ON CONFLICT (source_submission_id)\n    DO UPDATE SET\n        updated_at = NOW()\n\n    RETURNING\n        id,\n        campaign_code,\n        client_id,\n        source_submission_id,\n        status,\n        created_at,\n        updated_at\n),\n\nwrite_log AS (\n    INSERT INTO automation_logs (\n        workflow_name,\n        campaign_id,\n        level,\n        event_type,\n        message,\n        details\n    )\n    SELECT\n        '02 - AdFlow Client Intake',\n        save_campaign.id,\n        'info',\n        'campaign_intake_saved',\n        'Client and campaign brief saved successfully.',\n        jsonb_build_object(\n            'campaign_code',\n            save_campaign.campaign_code,\n            'client_code',\n            upsert_client.client_code,\n            'company_name',\n            upsert_client.company_name\n        )\n    FROM save_campaign\n    CROSS JOIN upsert_client\n\n    RETURNING id\n)\n\nSELECT\n    save_campaign.id AS campaign_id,\n    save_campaign.campaign_code,\n    save_campaign.source_submission_id,\n    save_campaign.status,\n    save_campaign.created_at,\n    save_campaign.updated_at,\n\n    upsert_client.id AS client_id,\n    upsert_client.client_code,\n    upsert_client.name AS client_name,\n    upsert_client.company_name,\n    upsert_client.email AS client_email,\n    upsert_client.website\n\nFROM save_campaign\nJOIN upsert_client\n    ON upsert_client.id = save_campaign.client_id;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json.db_payload) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "d7860678-2d8f-47c6-af51-81a7cb490b3b",
+      "name": "Save Client and Campaign",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "Iur9s96QxtuNJqZv",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/Iur9s96QxtuNJqZv",
+          "cachedResultName": "03 - Generate AI Campaign Package"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "campaign_id": "={{ $json.campaign_id }}",
+            "campaign_code": "={{ $json.campaign_code }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "campaign_id",
+              "displayName": "campaign_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            },
+            {
+              "id": "campaign_code",
+              "displayName": "campaign_code",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "b192e3f8-9c23-4574-aa69-6ad504e71982",
+      "name": "Start AI Generation"
+    }
+  ],
+  "connections": {
+    "Client Campaign Brief": {
+      "main": [
+        [
+          {
+            "node": "Normalize and Validate Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and Validate Brief": {
+      "main": [
+        [
+          {
+            "node": "Save Client and Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Client and Campaign": {
+      "main": [
+        [
+          {
+            "node": "Start AI Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start AI Generation": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "ucpLfArRw6Q1Ribz",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "75c5b2ed-8009-41ea-a281-741d6ec5a8af",
+  "activeVersionId": "75c5b2ed-8009-41ea-a281-741d6ec5a8af",
+  "versionCounter": 114,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-01T19:46:42.288Z",
+      "createdAt": "2026-08-01T19:46:42.288Z",
+      "role": "workflow:owner",
+      "workflowId": "az8lpGnRRIyERm8o",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Client Intake - Reliable Form Completion",
+    "description": "Removes the custom Campaign Saved form-ending node to prevent executions from remaining stuck after asynchronous AI generation. The form now finishes using n8n’s standard completion response while Workflow 03 continues in the background."
+  }
+}

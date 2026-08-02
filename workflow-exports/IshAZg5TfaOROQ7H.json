@@ -1,0 +1,289 @@
+{
+  "updatedAt": "2026-08-02T03:00:41.560Z",
+  "createdAt": "2026-08-01T22:20:40.711Z",
+  "id": "IshAZg5TfaOROQ7H",
+  "name": "06 - Process Campaign Decision",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "adflow-approval-decision",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "45ddaeb6-77a5-4a5c-a330-96a23cbb4dfc",
+      "name": "Receive Campaign Decision",
+      "webhookId": "e8eda2b6-202c-455e-bb66-0b2f99520958"
+    },
+    {
+      "parameters": {
+        "jsCode": "const request = $input.first().json;\n\n/**\n * HTML forms submitted through the Webhook normally appear\n * inside request.body.\n *\n * The fallback also makes manual tests easier.\n */\nconst body =\n  request.body &&\n  typeof request.body === 'object'\n    ? request.body\n    : request;\n\nfunction cleanSingleLine(value) {\n  return String(value ?? '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction cleanMultiline(value) {\n  return String(value ?? '')\n    .replace(/\\r\\n/g, '\\n')\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\nfunction escapeHtml(value) {\n  return String(value ?? '')\n    .replaceAll('&', '&amp;')\n    .replaceAll('<', '&lt;')\n    .replaceAll('>', '&gt;')\n    .replaceAll('\"', '&quot;')\n    .replaceAll(\"'\", '&#039;');\n}\n\nconst token = cleanSingleLine(body.token);\n\nconst reviewerName = cleanSingleLine(\n  body.reviewer_name\n);\n\nconst reviewerEmail = cleanSingleLine(\n  body.reviewer_email\n).toLowerCase();\n\nconst decision = cleanSingleLine(\n  body.decision\n);\n\nconst feedback = cleanMultiline(\n  body.feedback\n);\n\nconst errors = [];\n\nif (!/^[a-f0-9]{64}$/i.test(token)) {\n  errors.push(\n    'The campaign review token is missing or invalid.'\n  );\n}\n\nif (\n  reviewerName.length < 2 ||\n  reviewerName.length > 150\n) {\n  errors.push(\n    'Reviewer name must contain 2 to 150 characters.'\n  );\n}\n\nconst emailPattern =\n  /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\nif (!emailPattern.test(reviewerEmail)) {\n  errors.push(\n    'Enter a valid reviewer email address.'\n  );\n}\n\nconst allowedDecisions = [\n  'approved',\n  'revision_requested',\n  'rejected',\n];\n\nif (!allowedDecisions.includes(decision)) {\n  errors.push(\n    'Select Approve, Request Revision, or Reject.'\n  );\n}\n\nif (feedback.length > 5000) {\n  errors.push(\n    'Feedback cannot exceed 5,000 characters.'\n  );\n}\n\n/**\n * A revision request must explain what needs changing.\n */\nif (\n  decision === 'revision_requested' &&\n  feedback.length < 5\n) {\n  errors.push(\n    'Add clear revision instructions before requesting a new version.'\n  );\n}\n\n/**\n * Rejections should also include a reason.\n */\nif (\n  decision === 'rejected' &&\n  feedback.length < 5\n) {\n  errors.push(\n    'Add a brief reason for rejecting the campaign.'\n  );\n}\n\nconst validationOk = errors.length === 0;\n\nconst errorHtml = `\n<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n\n    <meta\n      name=\"viewport\"\n      content=\"width=device-width, initial-scale=1.0\"\n    >\n\n    <title>Invalid Campaign Decision</title>\n\n    <style>\n      * {\n        box-sizing: border-box;\n      }\n\n      body {\n        margin: 0;\n        padding: 30px 16px;\n        background: #f4f5f7;\n        color: #202124;\n        font-family: Arial, sans-serif;\n        line-height: 1.6;\n      }\n\n      .card {\n        max-width: 680px;\n        margin: 60px auto;\n        padding: 32px;\n        background: white;\n        border: 1px solid #dadce0;\n        border-radius: 14px;\n        box-shadow:\n          0 6px 24px rgba(0, 0, 0, 0.08);\n      }\n\n      h1 {\n        margin-top: 0;\n      }\n\n      li {\n        margin-bottom: 8px;\n      }\n\n      button {\n        padding: 12px 18px;\n        border: 0;\n        border-radius: 8px;\n        background: #202124;\n        color: white;\n        cursor: pointer;\n        font: inherit;\n        font-weight: 700;\n      }\n    </style>\n  </head>\n\n  <body>\n    <main class=\"card\">\n      <h1>We could not submit your decision</h1>\n\n      <p>Please correct the following:</p>\n\n      <ul>\n        ${errors\n          .map(\n            (error) =>\n              `<li>${escapeHtml(error)}</li>`\n          )\n          .join('')}\n      </ul>\n\n      <button onclick=\"history.back()\">\n        Return to the review\n      </button>\n    </main>\n  </body>\n</html>\n`;\n\nreturn [\n  {\n    json: {\n      validation_ok: validationOk,\n      validation_errors: errors,\n\n      token,\n      reviewer_name: reviewerName,\n      reviewer_email: reviewerEmail,\n      decision,\n      feedback,\n\n      db_payload: {\n        token,\n        reviewer_name: reviewerName,\n        reviewer_email: reviewerEmail,\n        decision,\n        feedback,\n      },\n\n      html: errorHtml,\n      status_code: validationOk ? 200 : 400,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "792f40e3-3c4b-4766-a24e-f27af8b7d7ac",
+      "name": "Validate Decision Submission"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1cd92518-fa92-4af7-9fb5-ceed087fd930",
+              "leftValue": "={{ $json.validation_ok }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        416,
+        0
+      ],
+      "id": "7791d637-c229-485b-b7bc-662369dae147",
+      "name": "Decision Input Valid?"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": "={{ $json.status_code }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        624,
+        96
+      ],
+      "id": "74db5d31-f872-4f56-b395-1aeb00eff2e6",
+      "name": "Show Invalid Submission"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH input_data AS (\n    SELECT $1::JSONB AS data\n),\n\nexisting_approval AS (\n    SELECT\n        a.id AS approval_id,\n        a.campaign_version_id,\n        a.decision AS current_decision,\n        a.expires_at,\n        a.decided_at,\n\n        cv.campaign_id,\n        cv.version_number,\n        cv.validation_status,\n\n        c.campaign_code,\n        c.status AS current_campaign_status,\n\n        cl.client_code,\n        cl.name AS client_name,\n        cl.company_name,\n        cl.email AS client_email\n\n    FROM approvals a\n\n    JOIN campaign_versions cv\n        ON cv.id = a.campaign_version_id\n\n    JOIN campaigns c\n        ON c.id = cv.campaign_id\n\n    JOIN clients cl\n        ON cl.id = c.client_id\n\n    CROSS JOIN input_data i\n\n    WHERE a.decision_token =\n        i.data->>'token'\n\n    LIMIT 1\n),\n\nupdated_approval AS (\n    UPDATE approvals a\n\n    SET\n        decision =\n            i.data->>'decision',\n\n        reviewer_name =\n            i.data->>'reviewer_name',\n\n        reviewer_email =\n            i.data->>'reviewer_email',\n\n        feedback =\n            NULLIF(\n                i.data->>'feedback',\n                ''\n            ),\n\n        decided_at = NOW()\n\n    FROM existing_approval e\n\n    CROSS JOIN input_data i\n\n    WHERE a.id = e.approval_id\n\n      AND a.decision = 'pending'\n\n      AND a.expires_at > NOW()\n\n      AND e.validation_status = 'passed'\n\n      AND e.current_campaign_status =\n          'awaiting_approval'\n\n      AND i.data->>'decision' IN (\n          'approved',\n          'revision_requested',\n          'rejected'\n      )\n\n    RETURNING\n        a.id AS approval_id,\n        a.campaign_version_id,\n        a.decision,\n        a.reviewer_name,\n        a.reviewer_email,\n        a.feedback,\n        a.requested_at,\n        a.expires_at,\n        a.decided_at\n),\n\nupdated_campaign AS (\n    UPDATE campaigns c\n\n    SET status =\n        CASE updated_approval.decision\n            WHEN 'approved'\n                THEN 'approved'\n\n            WHEN 'revision_requested'\n                THEN 'revision_requested'\n\n            WHEN 'rejected'\n                THEN 'rejected'\n        END\n\n    FROM updated_approval\n\n    JOIN campaign_versions cv\n        ON cv.id =\n           updated_approval.campaign_version_id\n\n    WHERE c.id = cv.campaign_id\n\n    RETURNING\n        c.id AS campaign_id,\n        c.campaign_code,\n        c.status AS campaign_status,\n        c.updated_at\n),\n\nenqueue_job AS (\n    INSERT INTO automation_jobs (\n        job_type,\n        campaign_id,\n        campaign_version_id,\n        approval_id,\n        status,\n        payload\n    )\n\n    SELECT\n        CASE updated_approval.decision\n            WHEN 'approved'\n                THEN 'create_production_tasks'\n\n            WHEN 'revision_requested'\n                THEN 'generate_revision'\n        END,\n\n        updated_campaign.campaign_id,\n\n        updated_approval.campaign_version_id,\n\n        updated_approval.approval_id,\n\n        'queued',\n\n        jsonb_build_object(\n            'campaign_code',\n                updated_campaign.campaign_code,\n\n            'decision',\n                updated_approval.decision,\n\n            'reviewer_name',\n                updated_approval.reviewer_name,\n\n            'reviewer_email',\n                updated_approval.reviewer_email,\n\n            'feedback',\n                updated_approval.feedback,\n\n            'requested_version_id',\n                updated_approval.campaign_version_id\n        )\n\n    FROM updated_approval\n\n    JOIN updated_campaign\n        ON TRUE\n\n    WHERE updated_approval.decision IN (\n        'approved',\n        'revision_requested'\n    )\n\n    ON CONFLICT (\n        approval_id,\n        job_type\n    )\n    WHERE approval_id IS NOT NULL\n\n    DO NOTHING\n\n    RETURNING\n        id,\n        job_type,\n        campaign_id,\n        campaign_version_id,\n        approval_id,\n        status,\n        available_at,\n        created_at\n),\n\nwrite_log AS (\n    INSERT INTO automation_logs (\n        workflow_name,\n        campaign_id,\n        level,\n        event_type,\n        message,\n        details\n    )\n\n    SELECT\n        '06 - Process Campaign Decision',\n\n        updated_campaign.campaign_id,\n\n        'info',\n\n        CASE updated_approval.decision\n            WHEN 'approved'\n                THEN 'campaign_approved'\n\n            WHEN 'revision_requested'\n                THEN 'campaign_revision_requested'\n\n            WHEN 'rejected'\n                THEN 'campaign_rejected'\n        END,\n\n        CASE updated_approval.decision\n            WHEN 'approved'\n                THEN 'The campaign package was approved by a human reviewer.'\n\n            WHEN 'revision_requested'\n                THEN 'The reviewer requested a new campaign version.'\n\n            WHEN 'rejected'\n                THEN 'The reviewer rejected the campaign package.'\n        END,\n\n        jsonb_build_object(\n            'campaign_code',\n                updated_campaign.campaign_code,\n\n            'campaign_version_id',\n                updated_approval.campaign_version_id,\n\n            'decision',\n                updated_approval.decision,\n\n            'reviewer_name',\n                updated_approval.reviewer_name,\n\n            'reviewer_email',\n                updated_approval.reviewer_email,\n\n            'feedback',\n                updated_approval.feedback\n        )\n\n    FROM updated_approval\n\n    JOIN updated_campaign\n        ON TRUE\n\n    RETURNING id\n)\n\nSELECT\n    CASE\n        WHEN updated_approval.approval_id\n             IS NOT NULL\n            THEN TRUE\n\n        ELSE FALSE\n    END AS processed,\n\n    CASE\n        WHEN updated_approval.approval_id\n             IS NOT NULL\n            THEN 'processed'\n\n        WHEN existing_approval.approval_id\n             IS NULL\n            THEN 'invalid_token'\n\n        WHEN existing_approval.current_decision\n             <> 'pending'\n            THEN 'already_decided'\n\n        WHEN existing_approval.expires_at\n             <= NOW()\n            THEN 'expired'\n\n        ELSE 'conflict'\n    END AS result_status,\n\n    CASE\n        WHEN updated_approval.approval_id\n             IS NOT NULL\n            THEN\n                CASE updated_approval.decision\n                    WHEN 'approved'\n                        THEN 'The campaign was approved successfully.'\n\n                    WHEN 'revision_requested'\n                        THEN 'The revision request was saved successfully.'\n\n                    WHEN 'rejected'\n                        THEN 'The campaign was rejected successfully.'\n                END\n\n        WHEN existing_approval.approval_id\n             IS NULL\n            THEN 'The approval token is invalid.'\n\n        WHEN existing_approval.current_decision\n             <> 'pending'\n            THEN 'A decision has already been submitted for this review.'\n\n        WHEN existing_approval.expires_at\n             <= NOW()\n            THEN 'This approval link has expired.'\n\n        ELSE\n            'The decision could not be processed because the campaign state changed.'\n    END AS result_message,\n\n    COALESCE(\n        updated_approval.approval_id,\n        existing_approval.approval_id\n    )::TEXT AS approval_id,\n\n    COALESCE(\n        updated_approval.campaign_version_id,\n        existing_approval.campaign_version_id\n    )::TEXT AS campaign_version_id,\n\n    COALESCE(\n        updated_campaign.campaign_id,\n        existing_approval.campaign_id\n    )::TEXT AS campaign_id,\n\n    COALESCE(\n        updated_campaign.campaign_code,\n        existing_approval.campaign_code\n    ) AS campaign_code,\n\n    COALESCE(\n        updated_approval.decision,\n        existing_approval.current_decision\n    ) AS decision,\n\n    updated_approval.reviewer_name,\n    updated_approval.reviewer_email,\n    updated_approval.feedback,\n    updated_approval.decided_at,\n\n    updated_campaign.campaign_status,\n\n    enqueue_job.id::TEXT\n        AS automation_job_id,\n\n    enqueue_job.job_type,\n    enqueue_job.status\n        AS job_status,\n\n    enqueue_job.available_at\n\nFROM input_data\n\nLEFT JOIN existing_approval\n    ON TRUE\n\nLEFT JOIN updated_approval\n    ON TRUE\n\nLEFT JOIN updated_campaign\n    ON TRUE\n\nLEFT JOIN enqueue_job\n    ON TRUE;",
+        "options": {
+          "queryReplacement": "={{ JSON.stringify($json.db_payload) }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        624,
+        -96
+      ],
+      "id": "772fa6b5-40df-49d5-9eb6-3344a1b424cf",
+      "name": "Save Review Decision",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $input.first().json;\n\nfunction escapeHtml(value) {\n  return String(value ?? '')\n    .replaceAll('&', '&amp;')\n    .replaceAll('<', '&lt;')\n    .replaceAll('>', '&gt;')\n    .replaceAll('\"', '&quot;')\n    .replaceAll(\"'\", '&#039;');\n}\n\nconst statusCodes = {\n  processed: 200,\n  invalid_token: 404,\n  already_decided: 409,\n  expired: 410,\n  conflict: 409,\n};\n\nlet pageTitle =\n  'Campaign decision unavailable';\n\nlet heading =\n  'We could not process the decision';\n\nlet explanation =\n  result.result_message;\n\nlet nextAction = '';\n\nif (result.processed) {\n  switch (result.decision) {\n    case 'approved':\n      pageTitle = 'Campaign Approved';\n      heading = 'Campaign approved';\n      explanation =\n        'Your approval was saved successfully.';\n\n      nextAction =\n        'Production task creation has been added to the automation queue.';\n      break;\n\n    case 'revision_requested':\n      pageTitle = 'Revision Requested';\n      heading = 'Revision requested';\n      explanation =\n        'Your feedback and revision instructions were saved successfully.';\n\n      nextAction =\n        'A new AI campaign version has been added to the automation queue.';\n      break;\n\n    case 'rejected':\n      pageTitle = 'Campaign Rejected';\n      heading = 'Campaign rejected';\n      explanation =\n        'Your rejection and feedback were saved successfully.';\n\n      nextAction =\n        'No additional campaign work was queued.';\n      break;\n  }\n}\n\nconst html = `\n<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\">\n\n    <meta\n      name=\"viewport\"\n      content=\"width=device-width, initial-scale=1.0\"\n    >\n\n    <title>${escapeHtml(pageTitle)}</title>\n\n    <style>\n      * {\n        box-sizing: border-box;\n      }\n\n      body {\n        margin: 0;\n        padding: 30px 16px;\n        background: #f4f5f7;\n        color: #202124;\n        font-family: Arial, sans-serif;\n        line-height: 1.6;\n      }\n\n      .card {\n        max-width: 720px;\n        margin: 60px auto;\n        padding: 34px;\n        background: white;\n        border: 1px solid #dadce0;\n        border-radius: 14px;\n        box-shadow:\n          0 6px 24px rgba(0, 0, 0, 0.08);\n      }\n\n      h1 {\n        margin-top: 0;\n      }\n\n      .reference {\n        margin-top: 24px;\n        padding: 16px;\n        background: #f8f9fa;\n        border: 1px solid #e3e5e8;\n        border-radius: 8px;\n      }\n\n      .label {\n        display: block;\n        margin-bottom: 4px;\n        color: #5f6368;\n        font-size: 12px;\n        font-weight: 700;\n        letter-spacing: 0.05em;\n        text-transform: uppercase;\n      }\n\n      .success {\n        display: inline-block;\n        margin-bottom: 18px;\n        padding: 6px 12px;\n        background: #e6f4ea;\n        border-radius: 999px;\n        color: #137333;\n        font-weight: 700;\n      }\n\n      .error {\n        display: inline-block;\n        margin-bottom: 18px;\n        padding: 6px 12px;\n        background: #fce8e6;\n        border-radius: 999px;\n        color: #c5221f;\n        font-weight: 700;\n      }\n    </style>\n  </head>\n\n  <body>\n    <main class=\"card\">\n      <span class=\"${\n        result.processed\n          ? 'success'\n          : 'error'\n      }\">\n        ${\n          result.processed\n            ? 'Decision saved'\n            : 'Decision not saved'\n        }\n      </span>\n\n      <h1>${escapeHtml(heading)}</h1>\n\n      <p>${escapeHtml(explanation)}</p>\n\n      ${\n        nextAction\n          ? `<p>${escapeHtml(nextAction)}</p>`\n          : ''\n      }\n\n      ${\n        result.campaign_code\n          ? `\n            <div class=\"reference\">\n              <span class=\"label\">\n                Campaign reference\n              </span>\n\n              ${escapeHtml(result.campaign_code)}\n            </div>\n          `\n          : ''\n      }\n\n      <p>\n        You may now close this page.\n      </p>\n    </main>\n  </body>\n</html>\n`;\n\nreturn [\n  {\n    json: {\n      ...result,\n      html,\n\n      status_code:\n        statusCodes[result.result_status] ??\n        400,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        -96
+      ],
+      "id": "da2ed5df-a019-4179-90c1-9f9772a59be1",
+      "name": "Build Decision Result Page"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": "={{ $json.status_code }}",
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              },
+              {
+                "name": "Referrer-Policy",
+                "value": "no-referrer"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        -96
+      ],
+      "id": "e6c4c3fa-9af9-42eb-8c76-8d93a83c3501",
+      "name": "Show Decision Result"
+    }
+  ],
+  "connections": {
+    "Receive Campaign Decision": {
+      "main": [
+        [
+          {
+            "node": "Validate Decision Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Decision Submission": {
+      "main": [
+        [
+          {
+            "node": "Decision Input Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision Input Valid?": {
+      "main": [
+        [
+          {
+            "node": "Save Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Show Invalid Submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Build Decision Result Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Decision Result Page": {
+      "main": [
+        [
+          {
+            "node": "Show Decision Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "ucpLfArRw6Q1Ribz",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "59ca7e59-3b66-49cb-b1e8-b1e7b7a6c8d7",
+  "activeVersionId": "59ca7e59-3b66-49cb-b1e8-b1e7b7a6c8d7",
+  "versionCounter": 59,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-01T22:20:40.711Z",
+      "createdAt": "2026-08-01T22:20:40.711Z",
+      "role": "workflow:owner",
+      "workflowId": "IshAZg5TfaOROQ7H",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "v1 - Process campaign decision",
+    "description": "Initial version with validation, database update, and decision result page."
+  }
+}

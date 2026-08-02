@@ -1,0 +1,107 @@
+{
+  "updatedAt": "2026-08-02T03:07:51.269Z",
+  "createdAt": "2026-08-02T03:04:33.285Z",
+  "id": "DdDFwBnEa6HCXTh7",
+  "name": "13A - MCP Get Campaign Status",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "campaign_code"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c9fbab2d-f381-4ebc-8e34-369eab6b0309",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    c.campaign_code,\n    c.status,\n    c.product_service,\n    c.objective,\n    c.brand_tone,\n    c.created_at,\n    c.updated_at,\n\n    cl.client_code,\n    cl.name AS client_name,\n    cl.company_name,\n\n    COUNT(DISTINCT cv.id)\n        AS version_count,\n\n    COUNT(DISTINCT pt.id)\n        AS production_task_count,\n\n    COUNT(\n        DISTINCT CASE\n            WHEN pt.status = 'completed'\n                THEN pt.id\n        END\n    ) AS completed_task_count\n\nFROM campaigns c\n\nJOIN clients cl\n    ON cl.id = c.client_id\n\nLEFT JOIN campaign_versions cv\n    ON cv.campaign_id = c.id\n\nLEFT JOIN production_tasks pt\n    ON pt.campaign_id = c.id\n\nWHERE c.campaign_code = $1\n\nGROUP BY\n    c.id,\n    cl.id;",
+        "options": {
+          "queryReplacement": "={{ $json.campaign_code }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "a44af280-f06f-4796-a3cf-4bd0a385cd09",
+      "name": "Get Campaign Status",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "4173687a-af75-4661-ae65-b6ef62459f8f",
+  "activeVersionId": null,
+  "versionCounter": 11,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T03:04:33.285Z",
+      "createdAt": "2026-08-02T03:04:33.285Z",
+      "role": "workflow:owner",
+      "workflowId": "DdDFwBnEa6HCXTh7",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

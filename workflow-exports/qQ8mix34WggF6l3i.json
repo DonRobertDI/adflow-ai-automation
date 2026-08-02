@@ -1,0 +1,99 @@
+{
+  "updatedAt": "2026-08-02T03:08:29.064Z",
+  "createdAt": "2026-08-02T03:08:03.051Z",
+  "id": "qQ8mix34WggF6l3i",
+  "name": "13B - MCP List Pending Approvals",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "837257f1-bb6b-4795-b0b7-ce9f6b849571",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    c.campaign_code,\n    cl.company_name,\n    cv.version_number,\n    a.requested_at,\n    a.expires_at,\n\n    CASE\n        WHEN a.expires_at <= NOW()\n            THEN 'expired'\n        ELSE 'pending'\n    END AS approval_status\n\nFROM approvals a\n\nJOIN campaign_versions cv\n    ON cv.id = a.campaign_version_id\n\nJOIN campaigns c\n    ON c.id = cv.campaign_id\n\nJOIN clients cl\n    ON cl.id = c.client_id\n\nWHERE a.decision = 'pending'\n\nORDER BY a.requested_at ASC\n\nLIMIT 50;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "4f125f8e-aaf4-44af-a12c-b777924cd45b",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "9db94863-5d0a-4aad-9cfa-56e5949a5785",
+  "activeVersionId": null,
+  "versionCounter": 5,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T03:08:03.051Z",
+      "createdAt": "2026-08-02T03:08:03.051Z",
+      "role": "workflow:owner",
+      "workflowId": "qQ8mix34WggF6l3i",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

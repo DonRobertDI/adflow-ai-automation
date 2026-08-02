@@ -1,0 +1,178 @@
+{
+  "updatedAt": "2026-08-02T19:00:06.223Z",
+  "createdAt": "2026-08-02T18:55:56.065Z",
+  "id": "3FlMSLDtsgi3J8lA",
+  "name": "17 - Website Contact API",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "adflow-api-contact",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8ccf0d83-3b9a-4df8-b306-3307a5bf081e",
+      "name": "Receive Website Contact Message",
+      "webhookId": "d03a37ec-f97e-4b03-99d9-9c735553cb33",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bOCgR1aWYwUeoyzQ",
+          "name": "AdFlow Website API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const request = $input.first().json;\n\n/**\n * n8n Webhook requests normally place JSON inside request.body.\n * The fallback also supports manual testing.\n */\nlet input = request.body ?? request;\n\nif (typeof input === 'string') {\n  try {\n    input = JSON.parse(input);\n  } catch {\n    throw new Error(\n      'Contact validation failed:\\n- The submitted request body is not valid JSON.'\n    );\n  }\n}\n\nif (\n  !input ||\n  typeof input !== 'object' ||\n  Array.isArray(input)\n) {\n  throw new Error(\n    'Contact validation failed:\\n- The submitted contact message is invalid.'\n  );\n}\n\n/**\n * Read the first available value from possible field names.\n */\nfunction getValue(...possibleNames) {\n  for (const name of possibleNames) {\n    const value = input[name];\n\n    if (\n      value !== undefined &&\n      value !== null &&\n      typeof value !== 'object'\n    ) {\n      return String(value).trim();\n    }\n  }\n\n  return '';\n}\n\n/**\n * Clean short single-line values.\n */\nfunction cleanSingleLine(value) {\n  return String(value ?? '')\n    .replace(/\\u0000/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/**\n * Clean multiline message text while keeping useful line breaks.\n */\nfunction cleanMultiline(value) {\n  return String(value ?? '')\n    .replace(/\\u0000/g, '')\n    .replace(/\\r\\n/g, '\\n')\n    .replace(/[ \\t]+/g, ' ')\n    .replace(/[ \\t]+\\n/g, '\\n')\n    .replace(/\\n{3,}/g, '\\n\\n')\n    .trim();\n}\n\n/**\n * Escape submitted text before inserting it into an HTML email.\n */\nfunction escapeHtml(value) {\n  return String(value ?? '')\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;')\n    .replace(/'/g, '&#039;');\n}\n\nconst name = cleanSingleLine(\n  getValue('name', 'Name')\n);\n\nconst email = cleanSingleLine(\n  getValue('email', 'Email')\n).toLowerCase();\n\nconst company = cleanSingleLine(\n  getValue('company', 'Company')\n);\n\nconst message = cleanMultiline(\n  getValue('message', 'Message')\n);\n\nconst requestId = cleanSingleLine(\n  getValue(\n    'request_id',\n    'requestId',\n    'Request ID'\n  )\n);\n\nconst validationErrors = [];\n\nif (!name) {\n  validationErrors.push('Name is required.');\n}\n\nif (!email) {\n  validationErrors.push('Email is required.');\n}\n\nif (!message) {\n  validationErrors.push('Message is required.');\n}\n\nconst emailPattern =\n  /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;\n\nif (\n  email &&\n  !emailPattern.test(email)\n) {\n  validationErrors.push(\n    'Email is not a valid email address.'\n  );\n}\n\nconst lengthLimits = [\n  ['Name', name, 150],\n  ['Email', email, 255],\n  ['Company', company, 200],\n  ['Message', message, 5000],\n  ['Request ID', requestId, 150],\n];\n\nfor (const [label, value, maximum] of lengthLimits) {\n  if (String(value).length > maximum) {\n    validationErrors.push(\n      `${label} exceeds the ${maximum}-character limit.`\n    );\n  }\n}\n\nif (validationErrors.length > 0) {\n  throw new Error(\n    `Contact validation failed:\\n- ${validationErrors.join('\\n- ')}`\n  );\n}\n\nconst receivedAt = new Date();\n\nconst datePart = receivedAt\n  .toISOString()\n  .replace(/\\D/g, '')\n  .slice(0, 14);\n\nconst randomPart = Math.random()\n  .toString(36)\n  .slice(2, 7)\n  .toUpperCase()\n  .padEnd(5, '0');\n\nconst contactReference =\n  `MSG-${datePart}-${randomPart}`;\n\nconst displayCompany =\n  company || 'Not provided';\n\nconst subject =\n  company\n    ? `[AdFlow Contact] ${name} — ${company}`\n    : `[AdFlow Contact] Message from ${name}`;\n\nconst plainTextMessage = [\n  'New AdFlow Studio contact message',\n  '',\n  `Reference: ${contactReference}`,\n  `Name: ${name}`,\n  `Email: ${email}`,\n  `Company: ${displayCompany}`,\n  `Received: ${receivedAt.toISOString()}`,\n  requestId\n    ? `Request ID: ${requestId}`\n    : '',\n  '',\n  'Message:',\n  message,\n].filter(Boolean).join('\\n');\n\nconst htmlMessage = `\n  <div style=\"\n    font-family: Arial, Helvetica, sans-serif;\n    max-width: 680px;\n    margin: 0 auto;\n    color: #111827;\n    line-height: 1.6;\n  \">\n    <div style=\"\n      background: #0b1020;\n      color: #ffffff;\n      padding: 24px;\n      border-radius: 12px 12px 0 0;\n    \">\n      <p style=\"\n        margin: 0 0 6px;\n        color: #ec4899;\n        font-size: 12px;\n        font-weight: 700;\n        letter-spacing: 1.2px;\n        text-transform: uppercase;\n      \">\n        AdFlow Studio\n      </p>\n\n      <h1 style=\"\n        margin: 0;\n        font-size: 24px;\n      \">\n        New website contact message\n      </h1>\n    </div>\n\n    <div style=\"\n      padding: 24px;\n      border: 1px solid #e5e7eb;\n      border-top: 0;\n      border-radius: 0 0 12px 12px;\n    \">\n      <table style=\"\n        width: 100%;\n        border-collapse: collapse;\n        margin-bottom: 24px;\n      \">\n        <tr>\n          <td style=\"\n            padding: 8px 0;\n            color: #6b7280;\n            width: 140px;\n          \">\n            Reference\n          </td>\n\n          <td style=\"\n            padding: 8px 0;\n            font-weight: 600;\n          \">\n            ${escapeHtml(contactReference)}\n          </td>\n        </tr>\n\n        <tr>\n          <td style=\"\n            padding: 8px 0;\n            color: #6b7280;\n          \">\n            Name\n          </td>\n\n          <td style=\"padding: 8px 0;\">\n            ${escapeHtml(name)}\n          </td>\n        </tr>\n\n        <tr>\n          <td style=\"\n            padding: 8px 0;\n            color: #6b7280;\n          \">\n            Email\n          </td>\n\n          <td style=\"padding: 8px 0;\">\n            <a href=\"mailto:${escapeHtml(email)}\">\n              ${escapeHtml(email)}\n            </a>\n          </td>\n        </tr>\n\n        <tr>\n          <td style=\"\n            padding: 8px 0;\n            color: #6b7280;\n          \">\n            Company\n          </td>\n\n          <td style=\"padding: 8px 0;\">\n            ${escapeHtml(displayCompany)}\n          </td>\n        </tr>\n\n        <tr>\n          <td style=\"\n            padding: 8px 0;\n            color: #6b7280;\n          \">\n            Received\n          </td>\n\n          <td style=\"padding: 8px 0;\">\n            ${escapeHtml(receivedAt.toISOString())}\n          </td>\n        </tr>\n      </table>\n\n      <div style=\"\n        padding: 18px;\n        background: #f9fafb;\n        border-radius: 8px;\n        white-space: pre-wrap;\n      \">${escapeHtml(message)}</div>\n\n      ${\n        requestId\n          ? `\n            <p style=\"\n              margin-top: 20px;\n              color: #9ca3af;\n              font-size: 12px;\n            \">\n              Request ID:\n              ${escapeHtml(requestId)}\n            </p>\n          `\n          : ''\n      }\n    </div>\n  </div>\n`;\n\nreturn [\n  {\n    json: {\n      success: true,\n\n      contact_reference:\n        contactReference,\n\n      name,\n      email,\n      company,\n      display_company:\n        displayCompany,\n\n      message,\n\n      request_id:\n        requestId,\n\n      received_at:\n        receivedAt.toISOString(),\n\n      subject,\n\n      plain_text_message:\n        plainTextMessage,\n\n      html_message:\n        htmlMessage,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "caf674d0-d1d2-42a3-a893-329bef866fcf",
+      "name": "Normalize and Validate Contact"
+    },
+    {
+      "parameters": {
+        "sendTo": "dimasayaodonrobert@gmail.com",
+        "subject": "={{\n  $('Normalize and Validate Contact')\n    .first()\n    .json\n    .subject\n}}",
+        "message": "={{\n  $('Normalize and Validate Contact')\n    .first()\n    .json\n    .html_message\n}}",
+        "options": {
+          "replyTo": "={{\n  $('Normalize and Validate Contact')\n    .first()\n    .json\n    .email\n}}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "6a88d208-7743-41de-bce2-feee170ae37c",
+      "name": "Send Contact Message to Studio",
+      "webhookId": "0e1cd6cf-d787-474e-85ab-21af318d6c0a",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "hLEkWVdS46nApANg",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    success: true,\n\n    message:\n      'Thanks — your message has been received. We will reply as soon as possible.',\n\n    reference:\n      $('Normalize and Validate Contact')\n        .first()\n        .json\n        .contact_reference\n  }\n}}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              },
+              {
+                "name": "X-Content-Type-Options",
+                "value": "nosniff"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        624,
+        0
+      ],
+      "id": "05a4c2fe-e44a-4779-8ef2-c52c1533fd30",
+      "name": "Return Contact Confirmation"
+    }
+  ],
+  "connections": {
+    "Receive Website Contact Message": {
+      "main": [
+        [
+          {
+            "node": "Normalize and Validate Contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize and Validate Contact": {
+      "main": [
+        [
+          {
+            "node": "Send Contact Message to Studio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Contact Message to Studio": {
+      "main": [
+        [
+          {
+            "node": "Return Contact Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "e67475b8-8637-4e1a-9a61-15ead3b144fd",
+  "activeVersionId": "e67475b8-8637-4e1a-9a61-15ead3b144fd",
+  "versionCounter": 29,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T18:55:56.065Z",
+      "createdAt": "2026-08-02T18:55:56.065Z",
+      "role": "workflow:owner",
+      "workflowId": "3FlMSLDtsgi3J8lA",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version e67475b8",
+    "description": ""
+  }
+}

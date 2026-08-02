@@ -1,0 +1,139 @@
+{
+  "updatedAt": "2026-08-02T16:42:24.978Z",
+  "createdAt": "2026-08-02T16:40:24.804Z",
+  "id": "LqTaclzl4nTr6Ol7",
+  "name": "14 - Website Campaign Status API",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "adflow-api-campaign-status",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "66e6cee9-c0df-40d4-8b2e-3529a6ea3a0d",
+      "name": "Webhook",
+      "webhookId": "40ca0a27-c405-41ea-b306-e5c5823c9349",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bOCgR1aWYwUeoyzQ",
+          "name": "AdFlow Website API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH target_campaign AS (\n    SELECT\n        c.id,\n        c.campaign_code,\n        c.status,\n        c.created_at,\n        c.updated_at,\n        c.pdf_file_name,\n        c.pdf_drive_url,\n        c.drive_folder_id,\n        c.delivery_ready_at,\n\n        cl.company_name,\n        cl.name AS client_name,\n\n        (\n            SELECT COUNT(*)\n            FROM campaign_versions cv\n            WHERE cv.campaign_id = c.id\n        ) AS version_count\n\n    FROM campaigns c\n\n    JOIN clients cl\n        ON cl.id = c.client_id\n\n    WHERE c.campaign_code = $1\n\n      AND c.portal_token = $2\n\n      AND c.portal_token_expires_at > NOW()\n\n    LIMIT 1\n),\n\nclient_timeline AS (\n    SELECT COALESCE(\n        JSONB_AGG(\n            JSONB_BUILD_OBJECT(\n                'event_type',\n                    event_type,\n\n                'label',\n                    CASE event_type\n                        WHEN 'campaign_intake_saved'\n                            THEN 'Brief received'\n\n                        WHEN 'ai_campaign_version_created'\n                            THEN 'Initial campaign draft prepared'\n\n                        WHEN 'campaign_revision_requested'\n                            THEN 'Revision requested'\n\n                        WHEN 'ai_campaign_revision_created'\n                            THEN 'Revised campaign prepared'\n\n                        WHEN 'campaign_approved'\n                            THEN 'Campaign approved'\n\n                        WHEN 'production_tasks_created'\n                            THEN 'Production planning started'\n\n                        WHEN 'campaign_workspace_created'\n                            THEN 'Campaign package ready'\n\n                        ELSE 'Campaign updated'\n                    END,\n\n                'created_at',\n                    created_at\n            )\n\n            ORDER BY created_at ASC\n        ),\n        '[]'::JSONB\n    ) AS timeline\n\n    FROM automation_logs\n\n    WHERE campaign_id = (\n        SELECT id\n        FROM target_campaign\n    )\n\n      AND event_type IN (\n          'campaign_intake_saved',\n          'ai_campaign_version_created',\n          'campaign_revision_requested',\n          'ai_campaign_revision_created',\n          'campaign_approved',\n          'production_tasks_created',\n          'campaign_workspace_created'\n      )\n)\n\nSELECT\n    CASE\n        WHEN target_campaign.id IS NOT NULL\n            THEN TRUE\n        ELSE FALSE\n    END AS success,\n\n    CASE\n        WHEN target_campaign.id IS NOT NULL\n            THEN 'valid'\n        ELSE 'not_found'\n    END AS result_status,\n\n    target_campaign.campaign_code,\n    target_campaign.company_name,\n    target_campaign.client_name,\n    target_campaign.status,\n    target_campaign.version_count,\n    target_campaign.created_at,\n    target_campaign.updated_at,\n    target_campaign.pdf_file_name,\n    target_campaign.pdf_drive_url,\n    target_campaign.drive_folder_id,\n    target_campaign.delivery_ready_at,\n    client_timeline.timeline\n\nFROM client_timeline\n\nLEFT JOIN target_campaign\n    ON TRUE;",
+        "options": {
+          "queryReplacement": "={{\n  [\n    $json.query?.campaign_code ?? '',\n    $json.query?.token ?? ''\n  ]\n}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "c5d0e8ee-ac95-424d-a6a1-5fe431dbc563",
+      "name": "Load Client Campaign Status",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    success: $json.success,\n    campaign: $json.success\n      ? {\n          code: $json.campaign_code,\n          company_name: $json.company_name,\n          client_name: $json.client_name,\n          status: $json.status,\n          version_count: Number($json.version_count),\n          created_at: $json.created_at,\n          updated_at: $json.updated_at\n        }\n      : null,\n\n    timeline: $json.timeline ?? [],\n\n    delivery: $json.success\n      ? {\n          ready: Boolean($json.delivery_ready_at),\n          pdf_file_name: $json.pdf_file_name,\n          pdf_url: $json.pdf_drive_url,\n          folder_url: $json.drive_folder_id\n            ? 'https://drive.google.com/drive/folders/' +\n              $json.drive_folder_id\n            : null,\n          ready_at: $json.delivery_ready_at\n        }\n      : null,\n\n    message: $json.success\n      ? 'Campaign status loaded.'\n      : 'The campaign link is invalid or expired.'\n  }\n}}",
+        "options": {
+          "responseCode": "={{ $json.success ? 200 : 404 }}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        0
+      ],
+      "id": "59c13022-5801-4119-b176-99ba28d1ec90",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Load Client Campaign Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Client Campaign Status": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "b51a01c1-f1c8-45ae-a94c-c4e13ffc4ac1",
+  "activeVersionId": "b51a01c1-f1c8-45ae-a94c-c4e13ffc4ac1",
+  "versionCounter": 15,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T16:40:24.804Z",
+      "createdAt": "2026-08-02T16:40:24.804Z",
+      "role": "workflow:owner",
+      "workflowId": "LqTaclzl4nTr6Ol7",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version b51a01c1",
+    "description": ""
+  }
+}

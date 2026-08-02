@@ -1,0 +1,142 @@
+{
+  "updatedAt": "2026-08-02T16:45:00.773Z",
+  "createdAt": "2026-08-02T16:43:40.760Z",
+  "id": "5hhskDgnQNUa7ZnD",
+  "name": "15 - Website Campaign Review API",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "adflow-api-campaign-review",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "299b2057-f575-48ad-abe4-35ab60ec8e35",
+      "name": "Open Campaign Review",
+      "webhookId": "aac2b212-4e60-47aa-b52a-ae29ae5a2f4a",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "bOCgR1aWYwUeoyzQ",
+          "name": "AdFlow Website API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH provided_token AS (\n    SELECT NULLIF($1::TEXT, '') AS token\n),\n\nreview_record AS (\n    SELECT\n        a.id::TEXT AS approval_id,\n        a.decision_token,\n        a.decision,\n        a.requested_at,\n        a.expires_at,\n        a.decided_at,\n\n        cv.id::TEXT AS campaign_version_id,\n        cv.version_number,\n        cv.generation_type,\n        cv.model_name,\n        cv.prompt_version,\n        cv.content,\n        cv.validation_status,\n        cv.created_at AS version_created_at,\n\n        c.id::TEXT AS campaign_id,\n        c.campaign_code,\n        c.product_service,\n        c.target_audience,\n        c.offer,\n        c.objective,\n        c.brand_tone,\n        c.status AS campaign_status,\n\n        cl.id::TEXT AS client_id,\n        cl.client_code,\n        cl.name AS client_name,\n        cl.company_name,\n        cl.email AS client_email,\n        cl.website\n\n    FROM approvals a\n\n    JOIN campaign_versions cv\n        ON cv.id = a.campaign_version_id\n\n    JOIN campaigns c\n        ON c.id = cv.campaign_id\n\n    JOIN clients cl\n        ON cl.id = c.client_id\n\n    CROSS JOIN provided_token p\n\n    WHERE a.decision_token = p.token\n\n    LIMIT 1\n)\n\nSELECT\n    CASE\n        WHEN r.approval_id IS NULL\n            THEN FALSE\n\n        WHEN r.decision <> 'pending'\n            THEN FALSE\n\n        WHEN r.expires_at <= NOW()\n            THEN FALSE\n\n        ELSE TRUE\n    END AS is_valid,\n\n    CASE\n        WHEN r.approval_id IS NULL\n            THEN 'invalid_token'\n\n        WHEN r.decision <> 'pending'\n            THEN 'already_decided'\n\n        WHEN r.expires_at <= NOW()\n            THEN 'expired'\n\n        ELSE 'valid'\n    END AS review_status,\n\n    CASE\n        WHEN r.approval_id IS NULL\n            THEN 'This review link is invalid.'\n\n        WHEN r.decision <> 'pending'\n            THEN 'A decision has already been submitted for this campaign version.'\n\n        WHEN r.expires_at <= NOW()\n            THEN 'This review link has expired.'\n\n        ELSE 'The review link is valid.'\n    END AS status_message,\n\n    COALESCE(\n        TO_JSONB(r),\n        '{}'::JSONB\n    ) AS review_data\n\nFROM provided_token p\n\nLEFT JOIN review_record r\n    ON TRUE;",
+        "options": {
+          "queryReplacement": "={{ $json.query?.token ?? '' }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "731796e2-ee56-4604-b286-f87b5c440d60",
+      "name": "Load Review Package",
+      "credentials": {
+        "postgres": {
+          "id": "eqQc6mzjf7cAv3Ov",
+          "name": "AdFlow PostgreSQL - Local"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{\n  {\n    success: $json.is_valid,\n    review_status: $json.review_status,\n    status_message: $json.status_message,\n\n    campaign: $json.is_valid\n      ? {\n          id: $json.review_data.campaign_id,\n          code: $json.review_data.campaign_code,\n          company_name:\n            $json.review_data.company_name,\n          client_name:\n            $json.review_data.client_name,\n          product_service:\n            $json.review_data.product_service,\n          target_audience:\n            $json.review_data.target_audience,\n          offer:\n            $json.review_data.offer,\n          objective:\n            $json.review_data.objective,\n          brand_tone:\n            $json.review_data.brand_tone\n        }\n      : null,\n\n    version: $json.is_valid\n      ? {\n          id:\n            $json.review_data.campaign_version_id,\n          number:\n            $json.review_data.version_number,\n          model:\n            $json.review_data.model_name,\n          created_at:\n            $json.review_data.version_created_at,\n          expires_at:\n            $json.review_data.expires_at\n        }\n      : null,\n\n    content: $json.is_valid\n      ? $json.review_data.content\n      : null\n  }\n}}",
+        "options": {
+          "responseCode": "={{\n  $json.is_valid\n    ? 200\n    : $json.review_status === 'expired'\n      ? 410\n      : $json.review_status === 'already_decided'\n        ? 409\n        : 404\n}}"
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        416,
+        0
+      ],
+      "id": "48ae1e12-e6f7-4edb-9e5f-bb98f322e42c",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "connections": {
+    "Open Campaign Review": {
+      "main": [
+        [
+          {
+            "node": "Load Review Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Review Package": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "ucpLfArRw6Q1Ribz",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "24a4a6d3-ab1c-4927-b954-8fec5da93381",
+  "activeVersionId": "24a4a6d3-ab1c-4927-b954-8fec5da93381",
+  "versionCounter": 11,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-02T16:43:40.760Z",
+      "createdAt": "2026-08-02T16:43:40.760Z",
+      "role": "workflow:owner",
+      "workflowId": "5hhskDgnQNUa7ZnD",
+      "projectId": "x6OK5veEAWqOKmnr",
+      "project": {
+        "updatedAt": "2026-08-01T07:35:39.082Z",
+        "createdAt": "2026-08-01T07:15:56.391Z",
+        "id": "x6OK5veEAWqOKmnr",
+        "name": "Don Robert Dimasayao <dimasayaodonrobert@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "f6e8bac1-1b51-4bda-b07b-e0247eae71f4"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": "Version 24a4a6d3",
+    "description": ""
+  }
+}
