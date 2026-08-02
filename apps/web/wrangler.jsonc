@@ -2,16 +2,5 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "adflow-studio",
   "compatibility_date": "2026-08-02",
-  "pages_build_output_dir": "dist",
-
-  "vars": {
-    "VITE_USE_MOCK_API": "false",
-    "VITE_TURNSTILE_SITE_KEY": "0x4AAAAAAEEmbWtNoC_BTjxt",
-    
-    "N8N_INTAKE_WEBHOOK_URL": "https://evaluate-joshua-strategy-diary.trycloudflare.com/webhook/adflow-api-campaign-intake",
-    "N8N_STATUS_WEBHOOK_URL": "https://evaluate-joshua-strategy-diary.trycloudflare.com/webhook/adflow-api-campaign-status",
-    "N8N_REVIEW_WEBHOOK_URL": "https://evaluate-joshua-strategy-diary.trycloudflare.com/webhook/adflow-api-campaign-review",
-    "N8N_DECISION_WEBHOOK_URL": "https://evaluate-joshua-strategy-diary.trycloudflare.com/webhook/adflow-api-campaign-decision",
-    "N8N_CONTACT_WEBHOOK_URL": "https://evaluate-joshua-strategy-diary.trycloudflare.com/webhook/adflow-api-contact"
-  }
+  "pages_build_output_dir": "dist"
 }
