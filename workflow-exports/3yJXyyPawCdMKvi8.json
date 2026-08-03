@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-02T18:12:08.405Z",
+  "updatedAt": "2026-08-02T22:27:38.486Z",
   "createdAt": "2026-08-02T16:30:51.710Z",
   "id": "3yJXyyPawCdMKvi8",
   "name": "02W - Website Campaign Intake API",
@@ -14,7 +14,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        208,
+        160,
         0
       ],
       "id": "7cde982b-75ea-44eb-88b5-28fa023eb45a",
@@ -31,7 +31,7 @@
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.7,
       "position": [
-        432,
+        416,
         0
       ],
       "id": "31f7f686-c089-4eca-96dc-52fc122aa77d",
@@ -89,7 +89,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1.3,
       "position": [
-        672,
+        704,
         0
       ],
       "id": "b8483a65-46dd-4d2d-8334-9ea85eae11ed",
@@ -106,7 +106,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -176,
+        -112,
         0
       ],
       "id": "025a2ac1-78fc-4152-a825-2273397370ae",
@@ -142,8 +142,8 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.5,
       "position": [
-        688,
-        176
+        704,
+        208
       ],
       "id": "7df3342a-d23f-475a-b2b4-df3773b15fda",
       "name": "Return Campaign Confirmation"
@@ -208,9 +208,9 @@
   },
   "nodeGroups": [],
   "pinData": {},
-  "versionId": "760b5b7d-cfe8-44db-928d-790bde7ba3bf",
-  "activeVersionId": "760b5b7d-cfe8-44db-928d-790bde7ba3bf",
-  "versionCounter": 57,
+  "versionId": "629f8418-ec17-421b-957a-fb075b386ea3",
+  "activeVersionId": "629f8418-ec17-421b-957a-fb075b386ea3",
+  "versionCounter": 61,
   "triggerCount": 1,
   "sourceWorkflowId": null,
   "tags": [],
@@ -235,7 +235,7 @@
     }
   ],
   "versionMetadata": {
-    "name": "Version 760b5b7d",
+    "name": "Version 629f8418",
     "description": ""
   }
 }

@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-08-02T17:01:31.975Z",
+  "updatedAt": "2026-08-02T22:32:24.370Z",
   "createdAt": "2026-08-01T21:57:19.344Z",
   "id": "VzxqZToGPHJnvTq4",
   "name": "04 - Create Campaign Approval Request",
@@ -27,7 +27,7 @@
       "typeVersion": 1.2,
       "position": [
         240,
-        112
+        208
       ],
       "id": "4c7bac4b-4ef6-4976-bfa3-9c734a10dbfe",
       "name": "Receive Campaign Version"
@@ -37,8 +37,8 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -32,
-        320
+        -464,
+        448
       ],
       "id": "2f40c4fe-a2ce-4faf-b6e4-598668cd6421",
       "name": "Temporary Manual Test"
@@ -72,8 +72,8 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.5,
       "position": [
-        256,
-        320
+        -320,
+        448
       ],
       "id": "071c9c00-0d4c-48a9-8b75-97e09dd6c024",
       "name": "Temporary Campaign IDs"
@@ -108,7 +108,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        752,
+        720,
         208
       ],
       "id": "e0aa3bb3-3031-40ad-9709-93c3d68b50e0",
@@ -229,13 +229,7 @@
     },
     "Temporary Campaign IDs": {
       "main": [
-        [
-          {
-            "node": "Create Pending Approval",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        []
       ]
     },
     "Receive Campaign Version": {
@@ -297,9 +291,9 @@
   },
   "nodeGroups": [],
   "pinData": {},
-  "versionId": "012d6560-f9d3-4122-8c71-c997b867536c",
-  "activeVersionId": "56b547cb-96bd-456a-98db-bf5f303e532c",
-  "versionCounter": 84,
+  "versionId": "b246c346-4c99-4496-9be6-6b93bc27bf82",
+  "activeVersionId": "b246c346-4c99-4496-9be6-6b93bc27bf82",
+  "versionCounter": 90,
   "triggerCount": 0,
   "sourceWorkflowId": null,
   "tags": [],
@@ -324,7 +318,7 @@
     }
   ],
   "versionMetadata": {
-    "name": null,
-    "description": null
+    "name": "Version b246c346",
+    "description": ""
   }
 }
